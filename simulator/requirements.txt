@@ -1,0 +1,5 @@
+faker
+requests
+geopy
+python-dotenv
+kafka-python

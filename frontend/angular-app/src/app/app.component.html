@@ -1,0 +1,159 @@
+<div class="app-shell">
+
+  <!-- Top Navigation Bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo">
+        <span class="logo-icon">🚛</span>
+        <div class="logo-text">
+          <span class="logo-title">FLEETPULSE</span>
+          <span class="logo-sub">Live Tracking System</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="topbar-stats">
+      <div class="stat-chip">
+        <span class="chip-val">{{ trucks.length }}</span>
+        <span class="chip-label">TOTAL</span>
+      </div>
+      <div class="stat-chip ok">
+        <span class="chip-val">{{ normalCount }}</span>
+        <span class="chip-label">NORMAL</span>
+      </div>
+      <div class="stat-chip alert" [class.blink]="alertCount > 0">
+        <span class="chip-val">{{ alertCount }}</span>
+        <span class="chip-label">ALERTS</span>
+      </div>
+      <div class="stat-chip speed">
+        <span class="chip-val">{{ avgSpeed }}</span>
+        <span class="chip-label">AVG KM/H</span>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        LIVE
+      </div>
+      <span class="last-update">Updated {{ lastUpdated | date:'HH:mm:ss' }}</span>
+    </div>
+  </header>
+
+  <div class="main-layout">
+
+    <!-- Sidebar: Truck List -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span>FLEET</span>
+        <span class="count-badge">{{ trucks.length }}</span>
+      </div>
+
+      <div class="loading-state" *ngIf="isLoading">
+        <div class="spinner"></div>
+        <span>Connecting...</span>
+      </div>
+
+      <div class="truck-list" *ngIf="!isLoading">
+        <div
+          class="truck-card"
+          *ngFor="let truck of trucks"
+          [class.selected]="selectedTruck?.truck_id === truck.truck_id"
+          [class.anomaly-card]="truck.anomaly !== 'none'"
+          (click)="selectTruck(truck)"
+        >
+          <div class="card-top">
+            <div class="truck-id">
+              <span class="truck-icon">🚛</span>
+              <span>T-{{ truck.truck_id | number:'2.0-0' }}</span>
+            </div>
+            <div class="anomaly-badge" [style.background]="getAnomalyColor(truck.anomaly)">
+              {{ getAnomalyIcon(truck.anomaly) }}&nbsp;{{ truck.anomaly }}
+            </div>
+          </div>
+
+          <div class="card-metrics">
+            <div class="metric">
+              <span class="metric-icon">⚡</span>
+              <strong>{{ truck.speed | number:'1.0-0' }}</strong>
+              <span class="metric-unit">km/h</span>
+            </div>
+            <div class="metric">
+              <span class="metric-icon">⛽</span>
+              <strong>{{ truck.fuel_level | number:'1.0-0' }}</strong>
+              <span class="metric-unit">%</span>
+            </div>
+            <div class="metric">
+              <span class="metric-icon">🌡</span>
+              <strong>{{ truck.engine_temp | number:'1.0-0' }}</strong>
+              <span class="metric-unit">°C</span>
+            </div>
+          </div>
+
+          <div class="fuel-bar">
+            <div class="fuel-fill" [style.width.%]="truck.fuel_level"
+                 [style.background]="truck.fuel_level < 20 ? '#ff4d4d' : truck.fuel_level < 50 ? '#ff9500' : '#00e676'">
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Map -->
+    <div class="map-area">
+      <div id="map"></div>
+
+      <!-- Detail Panel (slides in on truck select) -->
+      <div class="detail-panel" *ngIf="selectedTruck" [style.border-color]="getAnomalyColor(selectedTruck.anomaly)">
+        <button class="close-btn" (click)="closeSidebar()">✕</button>
+        <div class="detail-header">
+          <div class="detail-icon" [style.color]="getAnomalyColor(selectedTruck.anomaly)">🚛</div>
+          <div>
+            <div class="detail-title">TRUCK #{{ selectedTruck.truck_id }}</div>
+            <div class="detail-anomaly" [style.color]="getAnomalyColor(selectedTruck.anomaly)">
+              {{ getAnomalyIcon(selectedTruck.anomaly) }} {{ selectedTruck.anomaly | uppercase }}
+            </div>
+          </div>
+          <div class="route-legend">
+            <div class="legend-item">
+                <div class="legend-line completed"></div>
+                <span>COMPLETED</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-line remaining"></div>
+                <span>REMAINING</span>
+            </div>
+            </div>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="di-label">SPEED</span>
+            <span class="di-val">{{ selectedTruck.speed | number:'1.1-1' }} <small>km/h</small></span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">FUEL</span>
+            <span class="di-val">{{ selectedTruck.fuel_level | number:'1.1-1' }} <small>%</small></span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">ENGINE TEMP</span>
+            <span class="di-val">{{ selectedTruck.engine_temp | number:'1.1-1' }} <small>°C</small></span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">LATITUDE</span>
+            <span class="di-val">{{ selectedTruck.latitude | number:'1.4-4' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">LONGITUDE</span>
+            <span class="di-val">{{ selectedTruck.longitude | number:'1.4-4' }}</span>
+          </div>
+          <div class="detail-item full">
+            <span class="di-label">DRIVER ID</span>
+            <span class="di-val small">{{ selectedTruck.driver_id }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
