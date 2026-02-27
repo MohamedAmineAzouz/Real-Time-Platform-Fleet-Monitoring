@@ -3,6 +3,8 @@ from faker import Faker
 from geopy.distance import geodesic
 from config import CITIES
 from route_service import get_route
+from datetime import datetime 
+
 
 fake = Faker()
 
@@ -172,6 +174,7 @@ class Truck:
                 "odometer_km": round(self._odometer_km, 2),
                 "refueling":   True,
                 "refuel_city": self.refuel_city,
+                "timestamp":   datetime.utcnow().isoformat() + "Z",
             }
 
         # ── CASE 2: Route finished ────────────────────────────────────────────
@@ -212,4 +215,5 @@ class Truck:
             "odometer_km": round(self._odometer_km, 2),
             "refueling":   self.is_refueling,
             "refuel_city": self.refuel_city,
+            "timestamp":   datetime.utcnow().isoformat() + "Z",
         }

@@ -34,6 +34,7 @@ def start_simulation(num_trucks: int):
 
             theft_tag = " 🚨 THEFT" if data.get("theft") else ""
             print(
+                f"{data['timestamp']} | "  # ADD THIS LINE
                 f"Truck {data['truck_id']:>2} | "
                 f"{data['speed']:>6.1f} km/h | "
                 f"fuel {data['fuel_level']:>5.1f}% | "

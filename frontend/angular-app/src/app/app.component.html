@@ -36,7 +36,10 @@
         <span class="live-dot"></span>
         LIVE
       </div>
-      <span class="last-update">Updated {{ lastUpdated | date:'HH:mm:ss' }}</span>
+      <span class="last-update" *ngIf="trucks.length > 0">
+        Server: {{ formatServerTime(trucks[0].timestamp) }} | 
+        Local: {{ lastUpdated | date:'HH:mm:ss' }}
+      </span>
     </div>
   </header>
 
@@ -113,6 +116,13 @@
             <div class="detail-anomaly" [style.color]="getAnomalyColor(selectedTruck.anomaly)">
               {{ getAnomalyIcon(selectedTruck.anomaly) }} {{ selectedTruck.anomaly | uppercase }}
             </div>
+            <div class="detail-timestamp">
+              <span class="ts-label">📡</span>
+              <span class="ts-value">{{ formatServerTime(selectedTruck.timestamp) }}</span>
+              <span class="ts-age" [class.stale]="getDataAge(selectedTruck.timestamp).includes('m')">
+                {{ getDataAge(selectedTruck.timestamp) }}
+              </span>
+            </div>
           </div>
           <div class="route-legend">
             <div class="legend-item">
@@ -150,6 +160,16 @@
           <div class="detail-item full">
             <span class="di-label">DRIVER ID</span>
             <span class="di-val small">{{ selectedTruck.driver_id }}</span>
+          </div>
+          <div class="detail-item full">
+            <span class="di-label">LAST UPDATE (UTC)</span>
+            <span class="di-val small">{{ selectedTruck.timestamp || 'N/A' }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedTruck.theft">
+            <span class="di-label">⚠️ THEFT ALERT</span>
+            <span class="di-val" style="color: #ff4d4d; font-weight: bold;">
+              FUEL STOLEN: {{ selectedTruck.theft || 'Unknown' }}%
+            </span>
           </div>
         </div>
       </div>

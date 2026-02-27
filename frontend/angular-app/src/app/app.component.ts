@@ -46,6 +46,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly ANIMATION_DURATION = 1800;
   private readonly EASING = (t: number) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
+  serverTimeOffset: number = 0; 
+  selectedTruckLocalTime: string = '';
+
   constructor(private truckService: TruckService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
@@ -62,6 +65,41 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.map) this.map.remove();
   }
 
+  formatServerTime(isoTimestamp: string): string {
+    if (!isoTimestamp) return '--:--:--';
+    const date = new Date(isoTimestamp);
+    return date.toLocaleTimeString('en-GB', { 
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  }
+
+    getDataAge(isoTimestamp: string): string {
+    if (!isoTimestamp) return '';
+    const serverTime = new Date(isoTimestamp).getTime();
+    const now = Date.now();
+    const diff = now - serverTime;
+    
+    if (diff < 1000) return 'just now';
+    if (diff < 60000) return `${Math.floor(diff/1000)}s ago`;
+    return `${Math.floor(diff/60000)}m ago`;
+  }
+
+  selectTruck(truck: Truck): void {
+    this.selectedTruck = truck;
+    this.selectedTruckLocalTime = this.formatServerTime(truck.timestamp);
+    
+    if (this.map) {
+      this.map.flyTo([truck.latitude, truck.longitude], 12, { 
+        duration: 1.2, 
+        easeLinearity: 0.25 
+      });
+      this.ensureRouteLines(truck);
+    }
+    this.cdr.detectChanges();
+  }
   // ─────────────────────────────────────────────
   // Leaflet bootstrap
   // ─────────────────────────────────────────────
@@ -83,7 +121,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private initMap(): void {
     const L = (window as any).L;
     this.map = L.map('map', { center: [31.7917, -7.0926], zoom: 6, zoomControl: false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap © CARTO', maxZoom: 19
     }).addTo(this.map);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
@@ -115,14 +153,7 @@ export class AppComponent implements OnInit, OnDestroy {
   // Truck selection
   // ─────────────────────────────────────────────
 
-  selectTruck(truck: Truck): void {
-    this.selectedTruck = truck;
-    if (this.map) {
-      this.map.flyTo([truck.latitude, truck.longitude], 12, { duration: 1.2, easeLinearity: 0.25 });
-      this.ensureRouteLines(truck);
-    }
-    this.cdr.detectChanges();
-  }
+
 
   closeSidebar(): void {
     this.selectedTruck = null;

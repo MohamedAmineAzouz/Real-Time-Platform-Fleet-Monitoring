@@ -10,13 +10,15 @@ export interface Truck {
   fuel_level: number;
   engine_temp: number;
   driver_id: string;
+  start_city: string;
+  end_city: string;
+  odometer_km: number;
+  refueling: boolean;
+  refuel_city: string | null;
   anomaly: string;
-  start_city_lat: number;
-  start_city_lon: number;
-  end_city_lat: number;  
-  end_city_lon: number;  
+  theft: boolean;
+  timestamp: string; 
 }
-
 @Injectable({
   providedIn: 'root'
 })
