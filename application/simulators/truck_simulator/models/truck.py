@@ -1,8 +1,8 @@
 import random
 from faker import Faker
 from geopy.distance import geodesic
-from simulators.truck_simulator.config.settings import CITIES
-from simulators.truck_simulator.services.route_service import get_route
+from config.settings import CITIES
+from services.route_service import get_route
 from datetime import datetime 
 
 

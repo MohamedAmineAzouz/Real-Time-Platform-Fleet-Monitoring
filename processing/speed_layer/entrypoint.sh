@@ -12,7 +12,7 @@ python3 /app/storage/minio_init.py
 # Step 2: Resolve Maven packages from storage_config
 PACKAGES=$(python3 -c "
 import sys; sys.path.insert(0,'/app')
-from storage.storage_config import get_spark_packages
+from config.storage_config import get_spark_packages
 print(get_spark_packages())
 ")
 echo "▶ Spark packages: $PACKAGES"

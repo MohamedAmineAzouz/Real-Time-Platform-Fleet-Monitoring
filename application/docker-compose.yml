@@ -1,0 +1,40 @@
+version: "3.9"
+
+# ── IoT Simulation Layer ──────────────────────────────────────────────────────
+# Simulator + Backend API + Frontend
+# Requires streaming layer running first.
+# Start: docker compose -f docker-compose.iot.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  simulator:
+    build: ./simulators
+    # depends_on:
+    #   - kafka
+    environment:
+      KAFKA_BROKER: kafka:9092
+    networks:
+      - iot_network
+
+  backend:
+    build: ./backend
+    # depends_on:
+    #   - kafka
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_BROKER: kafka:9092
+    networks:
+      - iot_network
+
+  frontend:
+    build: ./frontend/angular-app
+    ports:
+      - "4200:80"
+    networks:
+      - iot_network
+
+networks:
+  iot_network:
+    external: true

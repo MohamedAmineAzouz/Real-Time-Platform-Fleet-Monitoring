@@ -1,4 +1,4 @@
-import random
+import random, os
 
 NUM_TRUCKS = 10
 UPDATE_INTERVAL = 2  # seconds
@@ -27,4 +27,5 @@ CITIES = {
     "Al Hoceima": (-3.9343, 35.2513)
 }
 
-KAFKA_TOPIC = "truck-gps"
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "truck-gps")
+

@@ -34,7 +34,7 @@ from pyspark.sql.types import (
     IntegerType, DoubleType, StringType, BooleanType,
 )
 
-from processing.speed_layer.config.storage_config import (
+from config.storage_config import (
     PATHS, get_spark_storage_conf, get_spark_packages, print_config
 )
 

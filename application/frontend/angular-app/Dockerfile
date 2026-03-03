@@ -6,7 +6,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+RUN npm install rxjs@7.8.2 --save --legacy-peer-deps
+
 COPY . .
+
 RUN npm run build
 
 # -------- NGINX STAGE --------

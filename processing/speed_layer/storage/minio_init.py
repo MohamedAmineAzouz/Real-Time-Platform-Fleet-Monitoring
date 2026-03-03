@@ -12,7 +12,7 @@ from minio import Minio
 from minio.error import S3Error
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from processing.speed_layer.config.storage_config import (
+from config.storage_config import (
     STORAGE_BACKEND, MINIO_BUCKET, MINIO_ENDPOINT, MINIO_ACCESS, MINIO_SECRET
 )
 

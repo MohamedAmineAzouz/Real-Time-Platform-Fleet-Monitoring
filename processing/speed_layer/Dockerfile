@@ -12,6 +12,7 @@ WORKDIR /app
 
 COPY storage/  ./storage/
 COPY spark_jobs/ ./spark_jobs/
+COPY config/ ./config/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

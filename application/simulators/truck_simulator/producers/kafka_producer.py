@@ -5,6 +5,7 @@ from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
 
 broker = os.getenv("KAFKA_BROKER", "kafka:9092")
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "truck-gps")
 
 producer = None
 while producer is None:
@@ -19,5 +20,5 @@ while producer is None:
         time.sleep(5)
 
 def send_to_kafka(data):
-    producer.send("truck-gps", data)
+    producer.send(KAFKA_TOPIC, data)
     producer.flush()
