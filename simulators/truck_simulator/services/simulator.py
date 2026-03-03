@@ -1,10 +1,10 @@
 import time
 import random
-from config import CITIES, UPDATE_INTERVAL
-from route_service import get_route
-from truck import Truck
-from anomaly import inject_anomaly
-from producer import send_to_kafka
+from simulators.truck_simulator.config.settings import CITIES, UPDATE_INTERVAL
+from simulators.truck_simulator.services.route_service import get_route
+from simulators.truck_simulator.models.truck import Truck
+from simulators.truck_simulator.services.anomaly import inject_anomaly
+from simulators.truck_simulator.producers.kafka_producer import send_to_kafka
 
 
 def start_simulation(num_trucks: int):
