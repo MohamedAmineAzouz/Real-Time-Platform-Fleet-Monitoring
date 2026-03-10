@@ -1,8 +1,7 @@
-version: "3.9"
-
-# ── Streaming Layer ───────────────────────────────────────────────────────────
-# Kafka + Zookeeper
-# Start first: docker compose -f docker-compose.yml up -d
+# ── Streaming Layer + Storage Layer + Speed Layer ─────────────────────────────
+# Start: docker compose --env-file .env.dev -f docker-compose.yml up -d
+# MinIO UI:     http://localhost:9001  (minioadmin / minioadmin)
+# Cassandra:    localhost:9042
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -26,67 +25,114 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT:-9092}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LEADER_IMBALANCE_CHECK_INTERVAL_SECONDS: 5
     networks:
       - iot_network
     healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
       interval: 15s
       retries: 10
       start_period: 30s
 
+  # All kafka-topics flags on ONE line — YAML > folds newlines into spaces
+  # which breaks CLI argument parsing (the bug you just hit)
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - iot_network
+    restart: "no"
+    command: ["bash", "-c", "kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${KAFKA_TOPIC:-truck-gps} --partitions 3 --replication-factor 1 && echo 'Topic ready.'"]
 
-  # ── Storage Layer ─────────────────────────────────────────────────────────
+  # ── Storage Layer: MinIO ──────────────────────────────────────────────────
   minio:
     image: minio/minio:RELEASE.2024-04-06T05-26-02Z
     command: server /data --console-address ":${MINIO_CONSOLE_PORT:-9001}"
     environment:
-      MINIO_ROOT_USER:     minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER:     ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
-      - "9000:9000"   # S3 API  (Spark writes here)
-      - "9001:9001"   # Web UI  →  http://localhost:9001
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
     networks:
       - iot_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_API_PORT:-9000}/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       retries: 8
       start_period: 10s
 
-  # ── Speed Layer ────────────────────────────────────────────────────────────
-  speed-layer:
-    build: ../processing/speed_layer
-    depends_on:
-      minio:
-        condition: service_healthy
+  # ── Storage Layer: Cassandra ──────────────────────────────────────────────
+  cassandra:
+    image: cassandra:4.1
     environment:
-      # ── Kafka
-      KAFKA_BROKER: ${KAFKA_BROKER:-kafka:9092}
-      KAFKA_TOPIC: ${KAFKA_TOPIC:-truck-gps}
-
-      # ── Storage backend: "minio" locally, change to "gcs" to migrate
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
-
-      # ── MinIO (active when STORAGE_BACKEND=minio)
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
-      MINIO_ACCESS: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-fleet-data}
-
-      # ── GCS (uncomment when STORAGE_BACKEND=gcs)
-      GCS_BUCKET: ${GCS_BUCKET:-}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      CASSANDRA_CLUSTER_NAME: fleet-cluster
+      CASSANDRA_DC:           dc1
+      HEAP_NEWSIZE:           128M
+      MAX_HEAP_SIZE:          512M
+    ports:
+      - "${CASSANDRA_PORT:-9042}:9042"
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    networks:
+      - iot_network
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 20s
+      retries: 15
+      start_period: 60s
+  # ── Cassandra UI (cassandra-web) ──────────────────────────────────────────
+  cassandra-ui:
+    image: ipushc/cassandra-web:latest
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    ports:
+      - "3000:8083"
+    environment:
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: "9042"
     networks:
       - iot_network
     restart: on-failure
-    # Uncomment when migrating to GCS:
-    # volumes:
-    #   - ./gcp-key.json:/secrets/gcp-key.json:ro
+
+  # ── Speed Layer: Spark Structured Streaming ───────────────────────────────
+  speed-layer:
+    build: ../processing/speed_layer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully  
+      minio:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER:    ${KAFKA_BROKER:-kafka:9092}
+      KAFKA_TOPIC:     ${KAFKA_TOPIC:-truck-gps}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
+      MINIO_ENDPOINT:  ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ACCESS:    ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET:    ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET:    ${MINIO_BUCKET:-fleet-data}
+      GCS_BUCKET:      ${GCS_BUCKET:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
+    networks:
+      - iot_network
+    restart: on-failure
 
 volumes:
   minio-data:
+  cassandra-data:
 
 networks:
   iot_network:

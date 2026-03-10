@@ -10,23 +10,23 @@ services:
 
   simulator:
     build: ./simulators
-    # depends_on:
-    #   - kafka
     environment:
-      KAFKA_BROKER: kafka:9092
+      KAFKA_BROKER: ${KAFKA_BROKER:-kafka:9092}
+      KAFKA_TOPIC:  ${KAFKA_TOPIC:-truck-gps}
     networks:
       - iot_network
 
   backend:
     build: ./backend
-    # depends_on:
-    #   - kafka
     ports:
       - "8000:8000"
     environment:
-      KAFKA_BROKER: kafka:9092
+      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
     networks:
       - iot_network
+    restart: on-failure
 
   frontend:
     build: ./frontend/angular-app

@@ -1,3 +1,5 @@
 fastapi
 uvicorn[standard]
 kafka-python
+cassandra-driver==3.29.1
+pydantic==2.7.1

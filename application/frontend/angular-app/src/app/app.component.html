@@ -2,13 +2,11 @@
 
   <!-- Top Navigation Bar -->
   <header class="topbar">
-    <div class="topbar-left">
-      <div class="logo">
-        <span class="logo-icon">🚛</span>
-        <div class="logo-text">
-          <span class="logo-title">FLEETPULSE</span>
-          <span class="logo-sub">Live Tracking System</span>
-        </div>
+    <div class="logo">
+      <span class="logo-icon">🚛</span>
+      <div class="logo-text">
+        <span class="logo-title">FLEETPULSE</span>
+        <span class="logo-sub">Live Tracking System</span>
       </div>
     </div>
 
@@ -36,10 +34,10 @@
         <span class="live-dot"></span>
         LIVE
       </div>
-      <span class="last-update" *ngIf="trucks.length > 0">
-        Server: {{ formatServerTime(trucks[0].timestamp) }} | 
-        Local: {{ lastUpdated | date:'HH:mm:ss' }}
-      </span>
+      <div class="last-update" *ngIf="trucks.length > 0">
+        <span>{{ formatServerTime(trucks[0].event_time) }}</span>
+        <span>{{ lastUpdated | date:'HH:mm:ss' }}</span>
+      </div>
     </div>
   </header>
 
@@ -62,7 +60,7 @@
           class="truck-card"
           *ngFor="let truck of trucks"
           [class.selected]="selectedTruck?.truck_id === truck.truck_id"
-          [class.anomaly-card]="truck.anomaly !== 'none'"
+          [class.anomaly-card]="truck.is_alert"
           (click)="selectTruck(truck)"
         >
           <div class="card-top">
@@ -70,8 +68,8 @@
               <span class="truck-icon">🚛</span>
               <span>T-{{ truck.truck_id | number:'2.0-0' }}</span>
             </div>
-            <div class="anomaly-badge" [style.background]="getAnomalyColor(truck.anomaly)">
-              {{ getAnomalyIcon(truck.anomaly) }}&nbsp;{{ truck.anomaly }}
+            <div class="anomaly-badge" [style.background]="getAlertColor(truck.alert_type)">
+              {{ getAlertIcon(truck.alert_type) }}&nbsp;{{ getAlertLabel(truck.alert_type) }}
             </div>
           </div>
 
@@ -94,7 +92,8 @@
           </div>
 
           <div class="fuel-bar">
-            <div class="fuel-fill" [style.width.%]="truck.fuel_level"
+            <div class="fuel-fill"
+                 [style.width.%]="truck.fuel_level"
                  [style.background]="truck.fuel_level < 20 ? '#ff4d4d' : truck.fuel_level < 50 ? '#ff9500' : '#00e676'">
             </div>
           </div>
@@ -106,34 +105,36 @@
     <div class="map-area">
       <div id="map"></div>
 
-      <!-- Detail Panel (slides in on truck select) -->
-      <div class="detail-panel" *ngIf="selectedTruck" [style.border-color]="getAnomalyColor(selectedTruck.anomaly)">
+      <!-- Detail Panel -->
+      <div class="detail-panel" *ngIf="selectedTruck"
+           [style.border-color]="getAlertColor(selectedTruck.alert_type)">
         <button class="close-btn" (click)="closeSidebar()">✕</button>
+
         <div class="detail-header">
-          <div class="detail-icon" [style.color]="getAnomalyColor(selectedTruck.anomaly)">🚛</div>
+          <div class="detail-icon" [style.color]="getAlertColor(selectedTruck.alert_type)">🚛</div>
           <div>
             <div class="detail-title">TRUCK #{{ selectedTruck.truck_id }}</div>
-            <div class="detail-anomaly" [style.color]="getAnomalyColor(selectedTruck.anomaly)">
-              {{ getAnomalyIcon(selectedTruck.anomaly) }} {{ selectedTruck.anomaly | uppercase }}
+            <div class="detail-anomaly" [style.color]="getAlertColor(selectedTruck.alert_type)">
+              {{ getAlertIcon(selectedTruck.alert_type) }} {{ selectedTruck.alert_type }}
             </div>
             <div class="detail-timestamp">
               <span class="ts-label">📡</span>
-              <span class="ts-value">{{ formatServerTime(selectedTruck.timestamp) }}</span>
-              <span class="ts-age" [class.stale]="getDataAge(selectedTruck.timestamp).includes('m')">
-                {{ getDataAge(selectedTruck.timestamp) }}
+              <span class="ts-value">{{ formatServerTime(selectedTruck.event_time) }}</span>
+              <span class="ts-age" [class.stale]="isStale(selectedTruck.event_time)">
+                {{ getDataAge(selectedTruck.event_time) }}
               </span>
             </div>
           </div>
           <div class="route-legend">
             <div class="legend-item">
-                <div class="legend-line completed"></div>
-                <span>COMPLETED</span>
+              <div class="legend-line completed"></div>
+              <span>COMPLETED</span>
             </div>
             <div class="legend-item">
-                <div class="legend-line remaining"></div>
-                <span>REMAINING</span>
+              <div class="legend-line remaining"></div>
+              <span>REMAINING</span>
             </div>
-            </div>
+          </div>
         </div>
 
         <div class="detail-grid">
@@ -147,7 +148,27 @@
           </div>
           <div class="detail-item">
             <span class="di-label">ENGINE TEMP</span>
-            <span class="di-val">{{ selectedTruck.engine_temp | number:'1.1-1' }} <small>°C</small></span>
+            <span class="di-val" [style.color]="selectedTruck.engine_temp > 100 ? '#ff4d4d' : 'inherit'">
+              {{ selectedTruck.engine_temp | number:'1.1-1' }} <small>°C</small>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">ODOMETER</span>
+            <span class="di-val">{{ selectedTruck.odometer_km | number:'1.0-0' }} <small>km</small></span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">ROUTE</span>
+            <span class="di-val small">{{ selectedTruck.start_city }} → {{ selectedTruck.end_city }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">DISTANCE</span>
+            <span class="di-val">{{ selectedTruck.distance_km | number:'1.2-2' }} <small>km</small></span>
+          </div>
+          <div class="detail-item">
+            <span class="di-label">FUEL RATE</span>
+            <span class="di-val" [style.color]="selectedTruck.high_consumption ? '#ff9500' : 'inherit'">
+              {{ selectedTruck.fuel_consumption_rate | number:'1.3-3' }} <small>%/km</small>
+            </span>
           </div>
           <div class="detail-item">
             <span class="di-label">LATITUDE</span>
@@ -158,18 +179,22 @@
             <span class="di-val">{{ selectedTruck.longitude | number:'1.4-4' }}</span>
           </div>
           <div class="detail-item full">
-            <span class="di-label">DRIVER ID</span>
+            <span class="di-label">DRIVER</span>
             <span class="di-val small">{{ selectedTruck.driver_id }}</span>
           </div>
           <div class="detail-item full">
-            <span class="di-label">LAST UPDATE (UTC)</span>
-            <span class="di-val small">{{ selectedTruck.timestamp || 'N/A' }}</span>
+            <span class="di-label">LAST EVENT (UTC)</span>
+            <span class="di-val small">{{ selectedTruck.event_time }}</span>
           </div>
-          <div class="detail-item" *ngIf="selectedTruck.theft">
-            <span class="di-label">⚠️ THEFT ALERT</span>
-            <span class="di-val" style="color: #ff4d4d; font-weight: bold;">
-              FUEL STOLEN: {{ selectedTruck.theft || 'Unknown' }}%
+          <div class="detail-item full" *ngIf="selectedTruck.theft">
+            <span class="di-label">🚨 FUEL THEFT DETECTED</span>
+            <span class="di-val" style="color:#ff4d4d">
+              AMOUNT: {{ selectedTruck.theft_amount | number:'1.1-1' }}%
             </span>
+          </div>
+          <div class="detail-item full" *ngIf="selectedTruck.refueling">
+            <span class="di-label">⛽ REFUELING</span>
+            <span class="di-val small">AT {{ selectedTruck.refuel_city }}</span>
           </div>
         </div>
       </div>
