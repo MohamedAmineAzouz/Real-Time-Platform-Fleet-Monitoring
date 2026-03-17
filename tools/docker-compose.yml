@@ -73,8 +73,8 @@ services:
     environment:
       CASSANDRA_CLUSTER_NAME: fleet-cluster
       CASSANDRA_DC:           dc1
-      HEAP_NEWSIZE:           128M
-      MAX_HEAP_SIZE:          512M
+      HEAP_NEWSIZE:           256M
+      MAX_HEAP_SIZE:          1024M
     ports:
       - "${CASSANDRA_PORT:-9042}:9042"
     volumes:

@@ -38,6 +38,7 @@ def get_spark_cassandra_conf() -> dict:
         "spark.cassandra.output.batch.grouping.key":     "partition",
         "spark.cassandra.output.batch.size.rows":        "1000",
         "spark.cassandra.connection.keepAliveMS":        "60000",
+        "spark.cassandra.output.batch.size.bytes":    "1024",
     }
     if CASSANDRA_USER:
         conf["spark.cassandra.auth.username"] = CASSANDRA_USER
