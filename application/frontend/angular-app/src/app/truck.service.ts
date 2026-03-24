@@ -20,7 +20,7 @@ export interface Truck {
   anomaly:                string;
   theft:                  boolean;
   theft_amount:           number | null;
-  alert_type:             string;   // NORMAL | OVERSPEED | OVERHEAT | FUEL_THEFT | FUEL_LEAK | LOW_FUEL
+  alert_type:             string;
   is_alert:               boolean;
   distance_km:            number;
   fuel_used:              number;
@@ -30,7 +30,9 @@ export interface Truck {
 
 @Injectable({ providedIn: 'root' })
 export class TruckService {
-  private apiUrl = 'http://localhost:8000';
+  // Relative URL — nginx proxies /api → backend:8000
+  // Works from any host/IP without hardcoding localhost
+  private apiUrl = '/api';
 
   constructor(private http: HttpClient) {}
 
