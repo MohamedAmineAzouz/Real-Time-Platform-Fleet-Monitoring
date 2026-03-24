@@ -12,7 +12,7 @@
 #   echo -e "AIRFLOW_UID=$(id -u)" >> .env
 #   docker compose --env-file ../../.env.dev -f docker-compose.batch.yml up -d
 #
-# UI: http://localhost:8080  (airflow / airflow)
+# UI: http://localhost:8081  (airflow / airflow)
 # ─────────────────────────────────────────────────────────────────────────────
 
 x-airflow-common:
@@ -214,7 +214,7 @@ services:
     <<: *airflow-common
     command: api-server
     ports:
-      - "8080:8080"
+      - "8081:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
       interval: 30s
