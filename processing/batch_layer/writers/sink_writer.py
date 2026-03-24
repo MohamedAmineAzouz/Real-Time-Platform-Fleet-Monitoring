@@ -3,16 +3,11 @@ writers/sink_writer.py
 ─────────────────────────────────────────────────────────────────────────────
 Unified writer interface.
 
-Usage (same call regardless of backend):
-
+Usage:
     from writers.sink_writer import write
+    write(df, "daily_truck_stats")
 
-    write(df, "daily_truck_stats", mode="overwrite")
-
-Internally routes to:
-  dev      → Cassandra via spark-cassandra-connector
-  staging  → BigQuery  via spark-bigquery connector
-  prod     → BigQuery  via spark-bigquery connector
+Routes to Cassandra (minio) or BigQuery (gcs) based on STORAGE_BACKEND.
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -27,16 +22,6 @@ from batch_config.batch_config import (
 
 
 def write(df: DataFrame, logical_table: str, mode: str = "overwrite"):
-    """
-    Write a DataFrame to the configured sink.
-
-    Args:
-        df:            Spark DataFrame to write.
-        logical_table: Key from BATCH_TABLES (e.g. "daily_truck_stats").
-        mode:          "overwrite" (default) or "append".
-                       Cassandra does upserts on overwrite via primary key.
-                       BigQuery truncates + rewrites on overwrite.
-    """
     if logical_table not in BATCH_TABLES:
         raise ValueError(
             f"Unknown table '{logical_table}'. "
@@ -49,12 +34,14 @@ def write(df: DataFrame, logical_table: str, mode: str = "overwrite"):
         _write_bigquery(df, BIGQUERY_TABLES[logical_table], mode)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def _write_cassandra(df: DataFrame, table: str, mode: str):
+    # FIX: Cassandra connector does NOT support mode="overwrite" (no TRUNCATE).
+    # It only supports "append" — upserts happen automatically via primary key.
+    # Passing "overwrite" raises: java.lang.IllegalArgumentException: Unsupported save mode
     (
         df.write
         .format("org.apache.spark.sql.cassandra")
-        .mode(mode)
+        .mode("append")                              # always append — PK handles upsert
         .options(table=table, keyspace=CASSANDRA_KEYSPACE)
         .save()
     )
@@ -65,9 +52,9 @@ def _write_bigquery(df: DataFrame, table: str, mode: str):
     (
         df.write
         .format("bigquery")
-        .option("table",        table)
-        .option("project",      BIGQUERY_PROJECT)
-        .option("writeMethod",  "indirect")          # uses GCS as staging area
+        .option("table",            table)
+        .option("project",          BIGQUERY_PROJECT)
+        .option("writeMethod",      "indirect")
         .option("writeDisposition", bq_mode)
         .save()
     )
