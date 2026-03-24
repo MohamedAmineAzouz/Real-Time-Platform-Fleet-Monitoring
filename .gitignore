@@ -1,2 +1,4 @@
 .env.dev
 .env.staging
+processing/batch_layer/logs/*
+**/__pycache__/*

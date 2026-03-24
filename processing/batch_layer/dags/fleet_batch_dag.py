@@ -2,36 +2,20 @@
 dags/fleet_batch_dag.py
 ─────────────────────────────────────────────────────────────────────────────
 Fleet Batch Layer — Airflow 3 DAG
-
-Airflow 3 key changes applied here:
-  - Imports from airflow.sdk  (@dag, @task, @task.branch)
-  - No BranchPythonOperator / PythonOperator — replaced by decorators
-  - EmptyOperator from airflow.providers.standard.operators.empty
-  - schedule= instead of schedule_interval=
-  - provide_context=True removed — context injected automatically
-  - logical_date replaces execution_date in context
-
-Pipeline:
-  check_source              ← verify Parquet data exists for the run date
-       │
-       ├─▶ run_spark_jobs ──┬─▶ daily_truck_stats     ──┐
-       │                   ├─▶ driver_performance     ──┤─▶ batch_complete
-       │                   ├─▶ fuel_and_maintenance   ──┤
-       │                   └─▶ route_efficiency        ──┘
-       │
-       └─▶ no_data_skip
 ─────────────────────────────────────────────────────────────────────────────
 """
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timedelta
 
-# ── Airflow 3: all core DAG constructs from airflow.sdk ───────────────────────
 from airflow.sdk import dag, task
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+
+log = logging.getLogger(__name__)
 
 # ── Environment ────────────────────────────────────────────────────────────────
 STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "minio")
@@ -50,12 +34,12 @@ SPARK_PACKAGES = _PACKAGES_DEV if STORAGE_BACKEND == "minio" else _PACKAGES_STAG
 SPARK_ENV_VARS = {
     "STORAGE_BACKEND":  STORAGE_BACKEND,
     "MINIO_ENDPOINT":   os.getenv("MINIO_ENDPOINT",   "http://minio:9000"),
-    "MINIO_ACCESS":     os.getenv("MINIO_ACCESS",      "minioadmin"),
-    "MINIO_SECRET":     os.getenv("MINIO_SECRET",      "minioadmin"),
-    "MINIO_BUCKET":     os.getenv("MINIO_BUCKET",      "fleet-data-dev"),
-    "GCS_BUCKET":       os.getenv("GCS_BUCKET",        ""),
-    "BIGQUERY_PROJECT": os.getenv("BIGQUERY_PROJECT",  ""),
-    "BIGQUERY_DATASET": os.getenv("BIGQUERY_DATASET",  "fleet_analytics"),
+    "MINIO_ACCESS":     os.getenv("MINIO_ACCESS",     "minioadmin"),
+    "MINIO_SECRET":     os.getenv("MINIO_SECRET",     "minioadmin"),
+    "MINIO_BUCKET":     os.getenv("MINIO_BUCKET",     "fleet-data-dev"),
+    "GCS_BUCKET":       os.getenv("GCS_BUCKET",       ""),
+    "BIGQUERY_PROJECT": os.getenv("BIGQUERY_PROJECT", ""),
+    "BIGQUERY_DATASET": os.getenv("BIGQUERY_DATASET", "fleet_analytics"),
     "GOOGLE_APPLICATION_CREDENTIALS": os.getenv("GOOGLE_APPLICATION_CREDENTIALS", ""),
     "CASSANDRA_HOST":     os.getenv("CASSANDRA_HOST",     "cassandra"),
     "CASSANDRA_PORT":     os.getenv("CASSANDRA_PORT",     "9042"),
@@ -63,17 +47,14 @@ SPARK_ENV_VARS = {
 }
 
 SPARK_CONF = {
-    "spark.sql.shuffle.partitions": "4",
+    "spark.sql.shuffle.partitions": "32",
     "spark.sql.adaptive.enabled":   "true",
 }
 
+SPARK_MASTER = os.getenv("SPARK_MASTER", "local[2]")
 
-# ── Helper: build SparkSubmitOperator ──────────────────────────────────────────
+
 def _spark_job(task_id: str, script: str) -> SparkSubmitOperator:
-    """
-    Wraps a Spark job script as a SparkSubmitOperator.
-    Dates are Jinja-templated from the DAG run logical_date.
-    """
     return SparkSubmitOperator(
         task_id=task_id,
         application=f"/opt/airflow/batch_layer/spark_jobs/{script}",
@@ -87,13 +68,13 @@ def _spark_job(task_id: str, script: str) -> SparkSubmitOperator:
         conf=SPARK_CONF,
         env_vars=SPARK_ENV_VARS,
         verbose=True,
+        spark_binary="spark-submit",
     )
 
 
-# ── DAG ────────────────────────────────────────────────────────────────────────
 @dag(
     dag_id="fleet_batch_layer",
-    description="Fleet analytics batch pipeline — Parquet → Cassandra (dev) or BigQuery (staging)",
+    description="Fleet analytics batch pipeline — Parquet → Cassandra (minio) or BigQuery (gcs)",
     default_args={
         "owner":            "fleet-team",
         "retries":          1,
@@ -108,70 +89,78 @@ def _spark_job(task_id: str, script: str) -> SparkSubmitOperator:
 )
 def fleet_batch_dag():
 
-    # ── Task 1: check source data exists ──────────────────────────────────────
-    # Airflow 3: @task.branch replaces BranchPythonOperator
-    # context is injected automatically — no provide_context=True needed
     @task.branch
-    def check_source(**context) -> str:   # ds = logical date YYYY-MM-DD (injected)
+    def check_source(**context) -> str:
         """
-        Verify that Parquet files exist for the run date before launching
-        Spark jobs. Returns the task_id of the next branch to execute.
+        Check Parquet source data exists for the run date.
+        Uses **context so Airflow injects ds, logical_date, etc automatically.
         """
         ds = context["ds"]
-        if STORAGE_BACKEND == "minio":
-            import boto3
-            from botocore.client import Config
+        log.info("check_source running for date=%s backend=%s", ds, STORAGE_BACKEND)
 
-            s3 = boto3.client(
-                "s3",
-                endpoint_url=os.getenv("MINIO_ENDPOINT", "http://minio:9000"),
-                aws_access_key_id=os.getenv("MINIO_ACCESS", "minioadmin"),
-                aws_secret_access_key=os.getenv("MINIO_SECRET", "minioadmin"),
-                config=Config(signature_version="s3v4"),
-            )
-            bucket   = os.getenv("MINIO_BUCKET", "fleet-data-dev")
-            prefix   = f"raw_events/event_time={ds}/"
-            result   = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
-            has_data = result.get("KeyCount", 0) > 0
-        else:
-            from google.cloud import storage as gcs
-            client   = gcs.Client()
-            bucket   = client.bucket(os.getenv("GCS_BUCKET", ""))
-            blobs    = list(bucket.list_blobs(prefix=f"raw_events/event_time={ds}/", max_results=1))
-            has_data = len(blobs) > 0
+        try:
+            if STORAGE_BACKEND == "minio":
+                import boto3
+                from botocore.client import Config
+                from botocore.exceptions import BotoCoreError, ClientError
+
+                log.info("Connecting to MinIO at %s", os.getenv("MINIO_ENDPOINT"))
+                s3 = boto3.client(
+                    "s3",
+                    endpoint_url=os.getenv("MINIO_ENDPOINT", "http://minio:9000"),
+                    aws_access_key_id=os.getenv("MINIO_ACCESS", "minioadmin"),
+                    aws_secret_access_key=os.getenv("MINIO_SECRET", "minioadmin"),
+                    config=Config(signature_version="s3v4"),
+                )
+                bucket = os.getenv("MINIO_BUCKET", "fleet-data-dev")
+                prefix = f"raw/"
+                log.info("Listing s3://%s/%s", bucket, prefix)
+                result   = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
+                has_data = result.get("KeyCount", 0) > 0
+                log.info("MinIO result: KeyCount=%s has_data=%s", result.get("KeyCount"), has_data)
+
+            else:
+                from google.cloud import storage as gcs
+                log.info("Connecting to GCS bucket=%s", os.getenv("GCS_BUCKET"))
+                client   = gcs.Client()
+                bucket   = client.bucket(os.getenv("GCS_BUCKET", ""))
+                blobs    = list(bucket.list_blobs(
+                    prefix=f"raw_events/event_time={ds}/", max_results=1
+                ))
+                has_data = len(blobs) > 0
+                log.info("GCS result: blobs=%s has_data=%s", len(blobs), has_data)
+
+        except Exception as e:
+            # Log the full exception so it appears in the Airflow task log
+            log.exception("check_source failed with exception: %s", e)
+            raise
 
         if has_data:
-            print(f"✅ Source data found for {ds}")
+            log.info("✅ Source data found for %s — proceeding to Spark jobs", ds)
             return "run_spark_jobs"
         else:
-            print(f"⚠️  No source data for {ds} — skipping")
+            log.warning("⚠️  No source data for %s — skipping batch run", ds)
             return "no_data_skip"
 
-    # ── Branch gates ──────────────────────────────────────────────────────────
+    batch_start   = EmptyOperator(task_id="batch_start")
     run_jobs_gate = EmptyOperator(task_id="run_spark_jobs")
     no_data       = EmptyOperator(task_id="no_data_skip")
 
-    # ── Spark jobs (run in parallel after gate) ───────────────────────────────
     t_daily_stats = _spark_job("daily_truck_stats",    "job_daily_truck_stats.py")
     t_driver_perf = _spark_job("driver_performance",   "job_driver_performance.py")
     t_fuel_maint  = _spark_job("fuel_and_maintenance", "job_fuel_and_maintenance.py")
     t_route_eff   = _spark_job("route_efficiency",     "job_route_efficiency.py")
 
-    # ── Completion marker ─────────────────────────────────────────────────────
     batch_done = EmptyOperator(
         task_id="batch_complete",
         trigger_rule="all_done",
     )
 
-    # ── Wiring ────────────────────────────────────────────────────────────────
     source = check_source()
 
-    source >> [run_jobs_gate, no_data]
-
+    batch_start >> source >> [run_jobs_gate, no_data]
     run_jobs_gate >> [t_daily_stats, t_driver_perf, t_fuel_maint, t_route_eff]
-
     [t_daily_stats, t_driver_perf, t_fuel_maint, t_route_eff] >> batch_done
 
 
-# Instantiate — Airflow 3 discovers the DAG from this call
 fleet_batch_dag()

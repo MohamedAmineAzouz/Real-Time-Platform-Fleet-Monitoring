@@ -32,8 +32,8 @@ from pyspark.sql.functions import (
     percentile_approx, stddev,
 )
 
-from config.batch_config import PARQUET_BASE, print_config
-from config.spark_config import get_spark_conf
+from batch_config.batch_config import PARQUET_BASE, print_config
+from batch_config.spark_config import get_spark_conf
 from writers.sink_writer import write
 
 

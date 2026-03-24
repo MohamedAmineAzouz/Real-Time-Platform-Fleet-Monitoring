@@ -84,20 +84,33 @@ def _init_minio():
 def _init_gcs():
     try:
         from google.cloud import storage as gcs
-        client = gcs.Client()
-        bucket = client.bucket(GCS_BUCKET)
-        if not bucket.exists():
-            raise RuntimeError(
-                f"❌ GCS bucket '{GCS_BUCKET}' does not exist. "
-                "Create it in the GCP Console first."
-            )
-        print(f"✅ GCS bucket verified : gs://{GCS_BUCKET}")
     except ImportError:
         raise RuntimeError(
             "google-cloud-storage is not installed. "
             "Add it to requirements.txt when using STORAGE_BACKEND=gcs."
         )
+ 
+    client = gcs.Client()
+    bucket = client.bucket(GCS_BUCKET)
+ 
+    if not bucket.exists():
+        raise RuntimeError(
+            f"❌ GCS bucket '{GCS_BUCKET}' does not exist. "
+            "Create it in the GCP Console first."
+        )
+    print(f"🪣  GCS bucket verified : gs://{GCS_BUCKET}")
 
+
+    for folder in FOLDERS:
+        blob = bucket.blob(folder + ".keep")
+        if not blob.exists():
+            blob.upload_from_string(b"")
+            print(f"   📁 {folder}")
+        else:
+            print(f"   ✓  {folder} (exists)")
+ 
+    print(f"✅ GCS ready — gs://{GCS_BUCKET}")
+ 
 
 # ── Cassandra ──────────────────────────────────────────────────────────────────
 

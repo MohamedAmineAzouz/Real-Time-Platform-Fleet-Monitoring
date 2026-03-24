@@ -1,0 +1,296 @@
+# ── Fleet Batch Layer — Airflow 3 + Spark ─────────────────────────────────────
+# Based on official Airflow 3 docker-compose template.
+#
+# Key additions vs template:
+#   - cassandra-batch-schema : auto-creates Cassandra tables on startup
+#   - spark-batch            : Spark container, shares /opt/spark via named volume
+#   - spark-home volume      : mounts Spark into all Airflow containers
+#   - SPARK_HOME / JAVA_HOME : lets SparkSubmitOperator find spark-submit
+#   - batch env vars         : forwarded to Spark jobs via SparkSubmitOperator
+#
+# Start:
+#   echo -e "AIRFLOW_UID=$(id -u)" >> .env
+#   docker compose --env-file ../../.env.dev -f docker-compose.batch.yml up -d
+#
+# UI: http://localhost:8080  (airflow / airflow)
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-airflow-common:
+  &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  # image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.8}
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR:                  LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER:              airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN:      postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY:                ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES:             'false'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL:  'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__API_AUTH__JWT_SECRET:            ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
+    AIRFLOW__API_AUTH__JWT_ISSUER:            ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK:  'true'
+    AIRFLOW_CONFIG:                           '/opt/airflow/config/airflow.cfg'
+
+    # ── Pip extras ──────────────────────────────────────────────────────────
+    _PIP_ADDITIONAL_REQUIREMENTS: ''
+
+    # ── Spark: tell SparkSubmitOperator where spark-submit lives ────────────
+    # spark-home volume mounts /opt/spark from spark-batch into all Airflow
+    # containers — no need to install Spark separately in the Airflow image.
+    SPARK_HOME:   /opt/spark
+    SPARK_MASTER: ${SPARK_MASTER:-local[2]}
+    # Airflow connection defined via env var — no CLI command needed, no timing issues
+    # Format: conn_type://conn_host?extra=JSON
+    AIRFLOW_CONN_SPARK_DEFAULT: 'spark://local?master=local%5B2%5D&deploy-mode=client'
+    # PATH: /opt/spark/bin:/opt/spark/sbin:$PATH
+
+    # ── Batch env vars forwarded to Spark jobs ───────────────────────────────
+    STORAGE_BACKEND:      ${STORAGE_BACKEND:-minio}
+    MINIO_ENDPOINT:       ${MINIO_ENDPOINT:-http://minio:9000}
+    MINIO_ACCESS:         ${MINIO_ROOT_USER:-minioadmin}
+    
+    MINIO_SECRET:         ${MINIO_ROOT_PASSWORD:-minioadmin}
+    MINIO_BUCKET:         ${MINIO_BUCKET:-fleet-data-dev}
+    GCS_BUCKET:           ${GCS_BUCKET:-}
+    BIGQUERY_PROJECT:     ${BIGQUERY_PROJECT:-}
+    BIGQUERY_DATASET:     ${BIGQUERY_DATASET:-fleet_analytics}
+    GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+    CASSANDRA_HOST:       ${CASSANDRA_HOST:-cassandra}
+    CASSANDRA_PORT:       ${CASSANDRA_PORT:-9042}
+    CASSANDRA_KEYSPACE:   ${CASSANDRA_KEYSPACE:-fleet}
+
+  volumes:
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ./spark_jobs:/opt/airflow/batch_layer/spark_jobs
+    - ./writers:/opt/airflow/batch_layer/writers
+    - ./batch_config:/opt/airflow/batch_layer/batch_config
+    # ── Spark binary shared from spark-batch container ──────────────────────
+    - spark-home:/opt/spark:ro
+  networks:
+    - iot_network
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+
+services:
+
+  # ── Postgres (Airflow metadata DB) ─────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER:     airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB:       airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    networks:
+      - iot_network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  # ── Spark batch container ──────────────────────────────────────────────────
+  # Exports /opt/spark via the spark-home named volume so all Airflow
+  # containers can call spark-submit without installing Spark themselves.
+  spark-batch:
+    image: spark:3.4.1-scala2.12-java11-python3-ubuntu
+    user: root
+    environment:
+      STORAGE_BACKEND:    ${STORAGE_BACKEND:-minio}
+      MINIO_ENDPOINT:     ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ACCESS:       ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET:       ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET:       ${MINIO_BUCKET:-fleet-data-dev}
+      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
+    volumes:
+      - ./spark_jobs:/app/spark_jobs
+      - ./writers:/app/writers
+      - ./batch_config:/app/config
+      # Export Spark to the named volume on first start
+      - spark-home:/opt/spark
+    networks:
+      - iot_network
+    # Copy Spark binaries to the named volume then stay alive
+    command: >
+      bash -c "
+        cp -rn /opt/spark/. /opt/spark/ 2>/dev/null || true &&
+        tail -f /dev/null
+      "
+
+  # ── Cassandra batch schema init (minio/dev only) ───────────────────────────
+  cassandra-batch-schema:
+    image: python:3.11-slim
+    environment:
+      STORAGE_BACKEND:    ${STORAGE_BACKEND:-minio}
+      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
+    volumes:
+      - ./batch_schema.py:/app/batch_schema.py:ro
+    networks:
+      - iot_network
+    restart: "no"
+    command:
+      - bash
+      - -c
+      - |
+        if [ "$$STORAGE_BACKEND" != "minio" ]; then
+          echo "⏭  STORAGE_BACKEND=$$STORAGE_BACKEND — skipping Cassandra schema init"
+          exit 0
+        fi
+
+        echo "📦 Installing cassandra-driver..."
+        pip install --upgrade pip && \
+        pip install --quiet cassandra-driver
+
+        echo "⏳ Waiting for Cassandra..."
+        until python3 - <<'PYEOF'
+        import os, sys
+        from cassandra.cluster import Cluster
+        try:
+            c = Cluster([os.getenv("CASSANDRA_HOST","cassandra")], port=int(os.getenv("CASSANDRA_PORT","9042")))
+            s = c.connect()
+            c.shutdown()
+        except Exception as e:
+            print(f"  not ready: {e}")
+            sys.exit(1)
+        PYEOF
+        do sleep 5; done
+
+        echo "🏗  Creating batch schema..."
+        python3 /app/batch_schema.py
+
+  # ── Airflow init ───────────────────────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -v -p /opt/airflow/{logs,dags,plugins,config}
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/
+        /entrypoint airflow version
+        /entrypoint airflow config list >/dev/null
+        chown -v -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config}
+        echo "Creating spark_default connection..."
+        /entrypoint airflow connections delete spark_default 2>/dev/null || true
+        /entrypoint airflow connections add spark_default \
+          --conn-type spark \
+          --conn-host local \
+          --conn-extra '{"master":"local[2]","deploy-mode":"client"}'
+        echo "✅ spark_default ready"
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE:        'true'
+      _AIRFLOW_WWW_USER_CREATE:   'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+      AIRFLOW_CONN_SPARK_DEFAULT: ''
+    user: "0:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cassandra-batch-schema:
+        condition: service_completed_successfully
+
+  # ── API server ─────────────────────────────────────────────────────────────
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── Scheduler ─────────────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── DAG processor ─────────────────────────────────────────────────────────
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── Triggerer ─────────────────────────────────────────────────────────────
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── CLI (debug profile only) ───────────────────────────────────────────────
+  airflow-cli:
+    <<: *airflow-common
+    profiles: [debug]
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    command: ["bash", "-c", "airflow"]
+    depends_on:
+      <<: *airflow-common-depends-on
+
+
+volumes:
+  postgres-db-volume:
+  spark-home:        # Spark binaries shared from spark-batch → all Airflow containers
+
+networks:
+  iot_network:
+    external: true

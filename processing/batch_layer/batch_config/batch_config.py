@@ -22,10 +22,10 @@ STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "minio")   # dev | staging | prod
 
 # ── Source: where Spark reads raw Parquet data ─────────────────────────────────
 if STORAGE_BACKEND == "minio":
-    PARQUET_BASE = f"s3a://{os.getenv("MINIO_BUCKET")}/raw_events/"
+    PARQUET_BASE = f"s3a://{os.getenv('MINIO_BUCKET', 'fleet-data-dev')}/raw/truck_events/"
 else:
     GCS_BUCKET   = os.getenv("GCS_BUCKET", "fleet-data-staging")
-    PARQUET_BASE = f"gs://{GCS_BUCKET}/raw_events/"
+    PARQUET_BASE = f"gs://{GCS_BUCKET}/raw/truck_events/"
 
 # ── Sink: where Spark writes aggregated results ────────────────────────────────
 # dev    → Cassandra tables
@@ -52,7 +52,7 @@ BIGQUERY_TABLES = {k: f"{BIGQUERY_DATASET}.{v}" for k, v in BATCH_TABLES.items()
 
 
 def is_dev() -> bool:
-    return STORAGE_BACKEND == "dev"
+    return STORAGE_BACKEND == "minio"
 
 
 def get_sink_label() -> str:

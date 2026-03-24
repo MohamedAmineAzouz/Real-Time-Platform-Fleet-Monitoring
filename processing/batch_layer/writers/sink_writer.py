@@ -17,7 +17,7 @@ Internally routes to:
 """
 
 from pyspark.sql import DataFrame
-from config.batch_config import (
+from batch_config.batch_config import (
     is_dev,
     CASSANDRA_KEYSPACE,
     BATCH_TABLES,
