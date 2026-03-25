@@ -70,7 +70,7 @@ def compute_route_efficiency(df: DataFrame, run_date: str) -> DataFrame:
         .agg(
             count("*")                               .alias("total_trips"),
             _round(avg("trip_distance_km"),    2)   .alias("avg_distance_km"),
-            _round(avg("trip_fuel_pct"),       2)   .alias("avg_fuel_pct"),
+            _round(avg("trip_fuel_pct"),       2)   .alias("avg_fuel_l"),
             _round(avg("fuel_per_100km"),      2)   .alias("avg_fuel_per_100km"),
             _round(avg("avg_speed"),           2)   .alias("avg_speed_kmh"),
             _round(avg("estimated_duration_min"), 1).alias("avg_duration_min"),
