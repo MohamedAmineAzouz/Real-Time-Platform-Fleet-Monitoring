@@ -36,11 +36,11 @@ def compute_route_efficiency(df: DataFrame, run_date: str) -> DataFrame:
 
     # Only driving events — cleaner route stats without refuel stops
     driving = df.filter(
-        col("refueling") == False &
-        col("start_city").isNotNull() &
-        col("end_city").isNotNull() &
-        (col("start_city") != col("end_city"))
-    )
+    (col("refueling") == False) &
+    (col("start_city").isNotNull()) &
+    (col("end_city").isNotNull()) &
+    (col("start_city") != col("end_city"))
+)
 
     per_trip = (
         driving

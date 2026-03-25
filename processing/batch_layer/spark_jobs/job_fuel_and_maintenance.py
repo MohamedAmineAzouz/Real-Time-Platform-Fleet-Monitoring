@@ -45,7 +45,7 @@ def compute_fuel_waste_anomalies(df: DataFrame, run_date: str) -> DataFrame:
         .agg(
             _round(_sum("distance_km"),       2).alias("total_distance_km"),
             # fuel_consumed_trip is a running total — take max (end of day value)
-            _round(_max("fuel_consumed_trip"), 2).alias("total_fuel_consumed_pct"),
+            _round(_max("fuel_consumed_trip"), 2).alias("total_fuel_l"),
             _round(
                 when(_sum("distance_km") > 0,
                     _max("fuel_consumed_trip") / _sum("distance_km") * 100

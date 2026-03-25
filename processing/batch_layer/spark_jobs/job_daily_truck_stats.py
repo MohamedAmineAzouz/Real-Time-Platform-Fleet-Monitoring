@@ -107,14 +107,14 @@ def compute_daily_truck_stats(df: DataFrame, run_date: str) -> DataFrame:
         .join(in_progress, on="truck_id", how="left")
         .fillna({"_completed_fuel": 0.0, "_inprogress_fuel": 0.0})
         .withColumn(
-            "total_fuel_consumed_pct",
+            "total_fuel_consumed_l",
             _round(col("_completed_fuel") + col("_inprogress_fuel"), 2)
         )
         .withColumn(
             "fuel_per_100km",
             _round(
                 when(col("total_distance_km") > 0,
-                    col("total_fuel_consumed_pct") / col("total_distance_km") * 100
+                    col("total_fuel_consumed_l") / col("total_distance_km") * 100
                 ).otherwise(lit(0.0)), 2
             )
         )

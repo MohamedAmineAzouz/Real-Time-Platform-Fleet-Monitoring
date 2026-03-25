@@ -44,7 +44,7 @@ def compute_driver_performance(df: DataFrame, run_date: str) -> DataFrame:
         .agg(
             count("*")                                          .alias("total_events"),
             _round(_sum("distance_km"),  2)                    .alias("total_distance_km"),
-            _round(_max("fuel_consumed_trip"), 2)              .alias("total_fuel_pct"),
+            _round(_max("fuel_consumed_trip"), 2)              .alias("total_fuel_l"),
             _round(avg("speed"),         2)                    .alias("avg_speed"),
             _round(_max("speed"),        2)                    .alias("max_speed"),
 
@@ -68,7 +68,7 @@ def compute_driver_performance(df: DataFrame, run_date: str) -> DataFrame:
             _sum(when(col("alert_type") == "FUEL_THEFT", 1).otherwise(0))
                                                              .alias("theft_events"),
         )
-        .fillna({"fuel_per_100km": 0.0, "total_fuel_pct": 0.0})
+        .fillna({"fuel_per_100km": 0.0, "total_fuel_l": 0.0})
     )
 
     # Fleet averages for relative scoring
