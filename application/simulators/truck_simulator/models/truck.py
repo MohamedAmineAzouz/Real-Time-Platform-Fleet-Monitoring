@@ -3,7 +3,7 @@ from faker import Faker
 from geopy.distance import geodesic
 from config.settings import CITIES
 from services.route_service import get_route
-from datetime import datetime , timedelta  
+from datetime import datetime, timedelta
 
 
 fake = Faker()
@@ -14,10 +14,8 @@ REFUEL_TARGET        = 95.0
 FUEL_STOP_THRESHOLD  = 20.0
 
 # ── Anomaly injection config ──────────────────────────────────────────────────
-# Each truck can enter an "anomaly mode" that forces its physics beyond
-# the normal safe range so anomaly.py can detect it from real telemetry.
-ANOMALY_START_CHANCE  = 0.06   # 6% per tick chance to enter anomaly mode
-ANOMALY_STOP_CHANCE   = 0.20   # 20% per tick chance to leave anomaly mode
+ANOMALY_START_CHANCE  = 0.06
+ANOMALY_STOP_CHANCE   = 0.20
 ANOMALY_TYPES         = ["overspeed", "overheat", "fuel_leak"]
 
 
@@ -50,8 +48,17 @@ class Truck:
         self._stopped_lat  = None
         self._stopped_lon  = None
 
-        # Anomaly mode — set inside truck so physics can reflect it
-        self._anomaly_mode : str | None = None  # "overspeed" | "overheat" | "fuel_leak" | None
+        # Anomaly mode
+        self._anomaly_mode: str | None = None
+
+        # ── Fuel tracking ─────────────────────────────────────────────────────
+        # fuel_consumed_trip: total fuel consumed (%) since last refuel/start
+        # fuel_refueled:      total fuel added (%) in the current refuel event
+        #                     (0.0 when not refueling, positive during/after refuel)
+        self._trip_fuel_start   = self.fuel_level   # fuel level at trip start
+        self._fuel_consumed_trip = 0.0              # accumulates each tick
+        self._fuel_refueled      = 0.0              # accumulates during refuel ticks
+        self._last_fuel_before_refuel = self.fuel_level  # snapshot when refuel starts
 
     # ─────────────────────────────────────────────────────────────────────────
     # Route helpers
@@ -68,11 +75,10 @@ class Truck:
             self.current_index = 0
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Anomaly mode state machine (lives in truck, drives physics)
+    # Anomaly mode state machine
     # ─────────────────────────────────────────────────────────────────────────
 
     def _tick_anomaly_mode(self):
-        """Randomly enter or leave anomaly mode each tick."""
         if self._anomaly_mode is None:
             if random.random() < ANOMALY_START_CHANCE:
                 self._anomaly_mode = random.choice(ANOMALY_TYPES)
@@ -85,41 +91,41 @@ class Truck:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _update_physics(self, distance_km: float):
-        """
-        Normal physics first, then anomaly mode pushes values past safe limits
-        so anomaly.py can detect them from the real telemetry numbers.
-        """
-        # ── Normal speed drift ────────────────────────────────────────────────
+        # Normal speed
         self.speed += random.uniform(-5, 5)
-        self.speed  = max(40, min(110, self.speed))   # safe ceiling: 110
+        self.speed  = max(40, min(110, self.speed))
 
-        # ── Normal fuel consumption ───────────────────────────────────────────
+        # Normal fuel consumption
         liters_per_km   = 0.08 + (self.speed / 1000)
         fuel_pct_per_km = (liters_per_km / 400) * 100
         fuel_consumed   = distance_km * fuel_pct_per_km
+        fuel_before     = self.fuel_level
         self.fuel_level = max(0, round(self.fuel_level - fuel_consumed, 3))
 
-        # ── Normal engine temp ────────────────────────────────────────────────
+        # Accumulate consumed fuel — only positive consumption (not refuel events)
+        actual_consumed = round(fuel_before - self.fuel_level, 4)
+        if actual_consumed > 0:
+            self._fuel_consumed_trip = round(self._fuel_consumed_trip + actual_consumed, 4)
+
+        # Normal engine temp
         target_temp      = 75 + (self.speed - 60) * 0.3
         self.engine_temp += (target_temp - self.engine_temp) * 0.1
         self.engine_temp += random.uniform(-1, 1)
-        self.engine_temp = round(max(65, min(95, self.engine_temp)), 2)   # safe ceiling: 95
+        self.engine_temp = round(max(65, min(95, self.engine_temp)), 2)
 
         self._odometer_km += distance_km
 
-        # ── Anomaly mode overrides ────────────────────────────────────────────
+        # Anomaly overrides
         if self._anomaly_mode == "overspeed":
-            # Push speed clearly above the 120 km/h detection threshold
             self.speed = round(random.uniform(125, 165), 2)
 
         elif self._anomaly_mode == "overheat":
-            # Push engine temp clearly above the 100°C detection threshold
             self.engine_temp = round(random.uniform(103, 135), 2)
 
         elif self._anomaly_mode == "fuel_leak":
-            # Drain a large extra chunk so the % per km rate spikes above 0.5
             extra_drain = round(random.uniform(3.0, 7.0), 3)
             self.fuel_level = max(0, round(self.fuel_level - extra_drain, 3))
+            self._fuel_consumed_trip = round(self._fuel_consumed_trip + extra_drain, 4)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Refuel helpers
@@ -131,26 +137,41 @@ class Truck:
         self._stopped_lon  = lon
         self.refuel_city   = _nearest_city(lat, lon)
         self.speed         = 0.0
-        self._anomaly_mode = None   # clear any anomaly while stopped
+        self._anomaly_mode = None
+        # Snapshot fuel level at the moment refueling starts
+        self._last_fuel_before_refuel = self.fuel_level
+        self._fuel_refueled           = 0.0
         print(f"⛽  Truck {self.truck_id} stopping at {self.refuel_city} "
               f"(fuel: {self.fuel_level:.1f}%)")
 
     def _do_refuel_tick(self):
+        fuel_before     = self.fuel_level
         self.fuel_level = min(REFUEL_TARGET, round(self.fuel_level + REFUEL_RATE_PER_TICK, 3))
+        # Accumulate how much fuel was added this tick
+        self._fuel_refueled = round(
+            self._fuel_refueled + (self.fuel_level - fuel_before), 4
+        )
         if self.fuel_level >= REFUEL_TARGET:
-            print(f"✅  Truck {self.truck_id} refueled to {self.fuel_level:.1f}% — resuming")
+            print(f"✅  Truck {self.truck_id} refueled to {self.fuel_level:.1f}% "
+                  f"(+{self._fuel_refueled:.1f}%) — resuming")
             self.is_refueling = False
             self.refuel_city  = None
+            # Reset trip fuel tracking for the next trip
+            self._trip_fuel_start    = self.fuel_level
+            self._fuel_consumed_trip = 0.0
+            # Keep _fuel_refueled so the last refueling event carries the total
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Public anomaly hooks (called by anomaly.py)
+    # Public anomaly hooks
     # ─────────────────────────────────────────────────────────────────────────
 
     def apply_anomaly_fuel_drain(self, extra_pct: float):
         self.fuel_level = max(0, round(self.fuel_level - extra_pct, 3))
+        self._fuel_consumed_trip = round(self._fuel_consumed_trip + extra_pct, 4)
 
     def apply_anomaly_fuel_theft(self, stolen_pct: float):
         self.fuel_level = max(0, round(self.fuel_level - stolen_pct, 3))
+        # Theft is NOT counted in fuel_consumed_trip — it's tracked separately
 
     # ─────────────────────────────────────────────────────────────────────────
     # Main tick
@@ -162,19 +183,21 @@ class Truck:
         if self.is_refueling:
             self._do_refuel_tick()
             return {
-                "truck_id":    self.truck_id,
-                "latitude":    round(self._stopped_lat, 6),
-                "longitude":   round(self._stopped_lon, 6),
-                "speed":       0.0,
-                "fuel_level":  self.fuel_level,
-                "engine_temp": round(self.engine_temp, 2),
-                "driver_id":   self.driver_id,
-                "start_city":  self.start_city,
-                "end_city":    self.end_city,
-                "odometer_km": round(self._odometer_km, 2),
-                "refueling":   True,
-                "refuel_city": self.refuel_city,
-                "timestamp":   (datetime.utcnow() + timedelta(hours=1)).isoformat() + "Z",
+                "truck_id":           self.truck_id,
+                "latitude":           round(self._stopped_lat, 6),
+                "longitude":          round(self._stopped_lon, 6),
+                "speed":              0.0,
+                "fuel_level":         self.fuel_level,
+                "engine_temp":        round(self.engine_temp, 2),
+                "driver_id":          self.driver_id,
+                "start_city":         self.start_city,
+                "end_city":           self.end_city,
+                "odometer_km":        round(self._odometer_km, 2),
+                "refueling":          True,
+                "refuel_city":        self.refuel_city,
+                "fuel_consumed_trip": round(self._fuel_consumed_trip, 4),
+                "fuel_refueled":      round(self._fuel_refueled, 4),
+                "timestamp":          (datetime.utcnow() + timedelta(hours=1)).isoformat() + "Z",
             }
 
         # ── CASE 2: Route finished ────────────────────────────────────────────
@@ -191,7 +214,6 @@ class Truck:
             (next_point[1], next_point[0])
         ).km
 
-        # Tick the anomaly mode state machine BEFORE physics so overrides apply
         self._tick_anomaly_mode()
         self._update_physics(distance)
         self.current_index += 1
@@ -203,17 +225,19 @@ class Truck:
             self._start_refueling(lat, lon)
 
         return {
-            "truck_id":    self.truck_id,
-            "latitude":    lat,
-            "longitude":   lon,
-            "speed":       round(self.speed, 2),
-            "fuel_level":  self.fuel_level,
-            "engine_temp": self.engine_temp,
-            "driver_id":   self.driver_id,
-            "start_city":  self.start_city,
-            "end_city":    self.end_city,
-            "odometer_km": round(self._odometer_km, 2),
-            "refueling":   self.is_refueling,
-            "refuel_city": self.refuel_city,
-            "timestamp":    (datetime.utcnow() + timedelta(hours=1)).isoformat() + "Z",
+            "truck_id":           self.truck_id,
+            "latitude":           lat,
+            "longitude":          lon,
+            "speed":              round(self.speed, 2),
+            "fuel_level":         self.fuel_level,
+            "engine_temp":        self.engine_temp,
+            "driver_id":          self.driver_id,
+            "start_city":         self.start_city,
+            "end_city":           self.end_city,
+            "odometer_km":        round(self._odometer_km, 2),
+            "refueling":          self.is_refueling,
+            "refuel_city":        self.refuel_city,
+            "fuel_consumed_trip": round(self._fuel_consumed_trip, 4),
+            "fuel_refueled":      round(self._fuel_refueled, 4),
+            "timestamp":          (datetime.utcnow() + timedelta(hours=1)).isoformat() + "Z",
         }

@@ -160,16 +160,24 @@
             <span class="di-label">ROUTE</span>
             <span class="di-val small">{{ selectedTruck.start_city }} → {{ selectedTruck.end_city }}</span>
           </div>
-          <div class="detail-item">
+          <!-- <div class="detail-item">
             <span class="di-label">DISTANCE</span>
             <span class="di-val">{{ selectedTruck.distance_km | number:'1.2-2' }} <small>km</small></span>
-          </div>
-          <div class="detail-item">
+          </div> -->
+          <!-- <div class="detail-item">
             <span class="di-label">FUEL RATE</span>
             <span class="di-val" [style.color]="selectedTruck.high_consumption ? '#ff9500' : 'inherit'">
               {{ selectedTruck.fuel_consumption_rate | number:'1.3-3' }} <small>%/km</small>
             </span>
-          </div>
+          </div> -->
+          <!-- <div class="detail-item">
+            <span class="di-label">TRIP FUEL USED</span>
+            <span class="di-val">{{ selectedTruck.fuel_consumed_trip | number:'1.1-1' }} <small>%</small></span>
+          </div> -->
+          <!-- <div class="detail-item" *ngIf="selectedTruck.refueling">
+            <span class="di-label">REFUELED</span>
+            <span class="di-val" style="color: var(--ok)">+{{ selectedTruck.fuel_refueled | number:'1.1-1' }} <small>%</small></span>
+          </div> -->
           <div class="detail-item">
             <span class="di-label">LATITUDE</span>
             <span class="di-val">{{ selectedTruck.latitude | number:'1.4-4' }}</span>

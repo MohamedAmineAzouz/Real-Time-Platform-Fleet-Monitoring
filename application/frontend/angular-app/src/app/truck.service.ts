@@ -26,12 +26,12 @@ export interface Truck {
   fuel_used:              number;
   fuel_consumption_rate:  number;
   high_consumption:       boolean;
+  fuel_consumed_trip:     number;   // ← NEW: total fuel consumed since last refuel (%)
+  fuel_refueled:          number;   // ← NEW: total fuel added in current refuel event (%)
 }
 
 @Injectable({ providedIn: 'root' })
 export class TruckService {
-  // Relative URL — nginx proxies /api → backend:8000
-  // Works from any host/IP without hardcoding localhost
   private apiUrl = '/api';
 
   constructor(private http: HttpClient) {}

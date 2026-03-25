@@ -3,10 +3,9 @@ cassandra_schema.py
 ─────────────────────────────────────────────────────────────────────────────
 Creates the fleet keyspace and all tables. Safe to re-run (IF NOT EXISTS).
 
-Tables:
-  truck_latest   — one row per truck (live map + current metrics)
-  truck_history  — full 24h time-series per truck (charts + telemetry)
-  alerts         — all alert events, 7 day TTL (alerts dashboard)
+New columns added:
+  fuel_consumed_trip  — total % fuel consumed since last refuel (simulator-computed)
+  fuel_refueled       — total % fuel added during current/last refuel event
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -29,8 +28,6 @@ DDL = [
     """,
 
     # ── truck_latest ──────────────────────────────────────────────────────────
-    # One row per truck_id. Every INSERT overwrites the previous row (upsert).
-    # No TTL — we always want the last known state for the live map.
     f"""
     CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.truck_latest (
         truck_id                int,
@@ -56,13 +53,13 @@ DDL = [
         fuel_used               double,
         fuel_consumption_rate   double,
         high_consumption        boolean,
+        fuel_consumed_trip      double,
+        fuel_refueled           double,
         PRIMARY KEY (truck_id)
     )
     """,
 
     # ── truck_history ─────────────────────────────────────────────────────────
-    # Full time-series. Partitioned by truck_id, newest-first.
-    # TTL 86400s = 24 hours.
     f"""
     CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.truck_history (
         truck_id                int,
@@ -88,15 +85,14 @@ DDL = [
         fuel_used               double,
         fuel_consumption_rate   double,
         high_consumption        boolean,
+        fuel_consumed_trip      double,
+        fuel_refueled           double,
         PRIMARY KEY (truck_id, processed_at)
     ) WITH CLUSTERING ORDER BY (processed_at DESC)
       AND default_time_to_live = 86400
     """,
 
     # ── alerts ────────────────────────────────────────────────────────────────
-    # Partitioned by (truck_id, alert_type) for dashboard queries like
-    # "all OVERSPEED events for truck 3".
-    # TTL 604800s = 7 days.
     f"""
     CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.alerts (
         truck_id                int,
@@ -114,10 +110,24 @@ DDL = [
         theft_amount            double,
         distance_km             double,
         fuel_consumption_rate   double,
+        fuel_consumed_trip      double,
+        fuel_refueled           double,
         PRIMARY KEY ((truck_id, alert_type), processed_at)
     ) WITH CLUSTERING ORDER BY (processed_at DESC)
       AND default_time_to_live = 604800
     """,
+]
+
+# ── ALTER TABLE for existing deployments ──────────────────────────────────────
+# If the tables already exist, ADD COLUMN is idempotent (IF NOT EXISTS not
+# supported in older Cassandra, so we catch and ignore AlreadyExists errors).
+ALTER_DDL = [
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_latest  ADD fuel_consumed_trip double",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_latest  ADD fuel_refueled      double",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_history ADD fuel_consumed_trip double",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_history ADD fuel_refueled      double",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.alerts        ADD fuel_consumed_trip double",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.alerts        ADD fuel_refueled      double",
 ]
 
 
@@ -151,6 +161,7 @@ def init_cassandra_schema():
 
     session, cluster = _connect()
     try:
+        # Create tables
         for ddl in DDL:
             stmt = ddl.strip()
             if not stmt:
@@ -158,7 +169,17 @@ def init_cassandra_schema():
             label = stmt.split("\n")[0].strip()[:72]
             print(f"  ▶ {label}")
             session.execute(stmt)
-        print(f"✅ Cassandra schema ready — tables: truck_latest, truck_history, alerts")
+
+        # Add new columns to existing tables (safe if already exists)
+        print("  ▶ Adding fuel_consumed_trip / fuel_refueled columns (if missing)...")
+        for alter in ALTER_DDL:
+            try:
+                session.execute(alter)
+                print(f"    ✅ {alter.split('ADD')[1].strip()}")
+            except Exception:
+                pass   # column already exists — ignore
+
+        print(f"✅ Schema ready — tables: truck_latest, truck_history, alerts")
     finally:
         cluster.shutdown()
 
