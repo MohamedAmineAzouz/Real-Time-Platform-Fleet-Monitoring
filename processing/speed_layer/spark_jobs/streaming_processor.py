@@ -75,6 +75,7 @@ _TELEMETRY_COLS = [
     "refueling", "refuel_city", "anomaly", "theft", "theft_amount",
     "alert_type", "is_alert",
     "distance_km", "fuel_used", "fuel_consumption_rate", "high_consumption",
+    "fuel_consumed_trip", "fuel_refueled",
 ]
 
 _ALERT_COLS = [
@@ -82,6 +83,7 @@ _ALERT_COLS = [
     "latitude", "longitude", "speed", "fuel_level", "engine_temp",
     "driver_id", "anomaly", "theft", "theft_amount",
     "distance_km", "fuel_consumption_rate",
+    "fuel_consumed_trip", "fuel_refueled",
 ]
 
 
@@ -117,8 +119,10 @@ def parse_kafka(spark: SparkSession) -> DataFrame:
         StructField("refuel_city",  StringType(),  True),
         StructField("anomaly",      StringType(),  True),
         StructField("theft",        BooleanType(), True),
-        StructField("theft_amount", DoubleType(),  True),
-        StructField("timestamp",    StringType(),  True),
+        StructField("theft_amount",      DoubleType(),  True),
+        StructField("fuel_consumed_trip", DoubleType(),  True),
+        StructField("fuel_refueled",      DoubleType(),  True),
+        StructField("timestamp",           StringType(),  True),
     ])
 
     raw = (
