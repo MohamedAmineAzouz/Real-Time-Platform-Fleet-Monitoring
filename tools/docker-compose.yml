@@ -130,6 +130,20 @@ services:
       - iot_network
     restart: on-failure
 
+  streamlit:
+    build: ../processing/streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
+    networks:
+      - iot_network
+    depends_on:
+      cassandra:
+        condition: service_healthy
+
 volumes:
   minio-data:
   cassandra-data:
