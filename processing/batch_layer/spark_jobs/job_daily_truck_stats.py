@@ -2,6 +2,22 @@
 spark_jobs/job_daily_truck_stats.py
 ─────────────────────────────────────────────────────────────────────────────
 Batch Job 1 — Daily Truck Statistics
+
+fuel_consumed_trip is a RUNNING TOTAL that resets on each refuel.
+Correct aggregation strategy:
+
+  Per truck per day:
+    total_distance_km      = SUM(distance_km)   where refueling=False
+    total_fuel_consumed_l = SUM of completed trip totals
+                             + current in-progress trip value
+                           = MAX(fuel_consumed_trip) per trip segment
+
+  A "trip segment" = events between two refuels.
+  fuel_consumed_trip resets to 0 after each refuel, so within a segment
+  it's monotonically increasing. MAX per segment = fuel used that segment.
+
+  fuel_per_100km = total_fuel_consumed_l / total_distance_km * 100
+                   should be ~5–20 %/km for this simulator
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -12,16 +28,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
     col, sum as _sum, avg, max as _max, count,
-    round as _round, to_date, lit, when, max as _max_ts,
+    round as _round, to_date, lit, when,
+    row_number, lag,
 )
+from pyspark.sql.window import Window
 
 from batch_config.batch_config import PARQUET_BASE, print_config
 from batch_config.spark_config import get_spark_conf
 from writers.sink_writer import write
 
 
-def build_spark() -> SparkSession:
-    builder = SparkSession.builder.appName("FleetBatch_DailyTruckStats")
+def build_spark(app_name: str = "FleetBatch_DailyTruckStats") -> SparkSession:
+    builder = SparkSession.builder.appName(app_name)
     for k, v in get_spark_conf().items():
         builder = builder.config(k, v)
     return builder.getOrCreate()
@@ -45,52 +63,70 @@ def read_parquet(spark: SparkSession, date_from: str, date_to: str) -> DataFrame
 
 def compute_daily_truck_stats(df: DataFrame, run_date: str) -> DataFrame:
     """
-    FIX: Use fuel_consumed_trip (simulator-computed) instead of lag()-based
-    fuel_used. fuel_consumed_trip is exact, always positive, and correctly
-    excludes refueling events by design in the simulator.
+    fuel_consumed_trip is a monotonically increasing running total within
+    each trip segment (resets to 0 after refuel).
 
-    For total daily fuel: take the MAX fuel_consumed_trip per truck
-    (it's a running total that resets after each refuel, so the max
-    across the day = the last trip's cumulative value, which is correct
-    when the truck hasn't refueled yet, or sum across refuel boundaries).
-
-    Better approach: sum fuel_consumed_trip only from refueling=True events
-    (which carry the completed trip total) PLUS the current in-progress trip.
+    Strategy:
+      1. Assign a trip segment ID per truck: increments each time refueling
+         transitions from True→False (i.e. refuel finished, new trip starts).
+      2. Take MAX(fuel_consumed_trip) per (truck, segment) = fuel for that segment.
+      3. Sum segment maxes = total fuel consumed across all segments today.
     """
 
-    # ── Completed trips: fuel_consumed_trip on the refueling event ─────────────
-    # When a truck finishes a trip and starts refueling, the refueling=True events
-    # carry the accumulated fuel_consumed_trip for that completed trip.
-    # Take the MAX per truck per trip (last refuel tick has the final total).
-    completed = (
+    # ── Step 1: identify trip segments ────────────────────────────────────────
+    # A new segment starts when refueling flips True→False
+    w_truck = Window.partitionBy("truck_id").orderBy("event_time")
+
+    segmented = (
         df
-        .filter(col("refueling") == True)
+        .withColumn("prev_refueling", lag("refueling", 1, False).over(w_truck))
+        # segment_start = True when truck just finished refueling (prev=True, now=False)
+        .withColumn(
+            "segment_start",
+            when(
+                (col("prev_refueling") == True) & (col("refueling") == False),
+                lit(1)
+            ).otherwise(lit(0))
+        )
+        # cumulative sum of segment_starts = trip segment ID per truck
+        .withColumn(
+            "trip_segment",
+            _sum("segment_start").over(w_truck.rowsBetween(Window.unboundedPreceding, 0))
+        )
+        .drop("prev_refueling", "segment_start")
+    )
+
+    # ── Step 2: max fuel per (truck, segment) — only from driving events ───────
+    driving = segmented.filter(col("refueling") == False)
+
+    per_segment = (
+        driving
+        .groupBy("truck_id", "trip_segment")
+        .agg(
+            _max("fuel_consumed_trip").alias("segment_fuel_pct"),
+            _sum("distance_km").alias("segment_distance_km"),
+        )
+        # Exclude segments with no meaningful data (first event before any driving)
+        .filter(col("segment_fuel_pct") > 0)
+    )
+
+    # ── Step 3: sum segments per truck ─────────────────────────────────────────
+    per_truck_fuel = (
+        per_segment
         .groupBy("truck_id")
         .agg(
-            _round(_sum("fuel_consumed_trip"), 2).alias("_completed_fuel"),
+            _round(_sum("segment_fuel_pct"),    2).alias("total_fuel_consumed_l"),
+            _round(_sum("segment_distance_km"), 2).alias("total_distance_km"),
         )
     )
 
-    # ── In-progress trip: latest fuel_consumed_trip from driving events ─────────
-    in_progress = (
-        df
-        .filter(col("refueling") == False)
-        .groupBy("truck_id")
-        .agg(
-            _round(_max_ts("fuel_consumed_trip"), 2).alias("_inprogress_fuel"),
-        )
-    )
-
-    # ── Main aggregation ────────────────────────────────────────────────────────
-    driving = df.filter(col("refueling") == False)
-
-    main = (
+    # ── Step 4: remaining metrics from driving events ──────────────────────────
+    per_truck_metrics = (
         driving
         .groupBy("truck_id")
         .agg(
-            _round(_sum("distance_km"),  2).alias("total_distance_km"),
             _round(avg("speed"),         2).alias("avg_speed_kmh"),
-            _round(_max_ts("speed"),     2).alias("max_speed_kmh"),
+            _round(_max("speed"),        2).alias("max_speed_kmh"),
             _sum(when(col("is_alert") == True,           1).otherwise(0)).alias("total_alerts"),
             _sum(when(col("alert_type") == "OVERSPEED",  1).otherwise(0)).alias("overspeed_count"),
             _sum(when(col("alert_type") == "OVERHEAT",   1).otherwise(0)).alias("overheat_count"),
@@ -100,29 +136,21 @@ def compute_daily_truck_stats(df: DataFrame, run_date: str) -> DataFrame:
         )
     )
 
-    # ── Join and compute final fuel metrics ─────────────────────────────────────
-    result = (
-        main
-        .join(completed,   on="truck_id", how="left")
-        .join(in_progress, on="truck_id", how="left")
-        .fillna({"_completed_fuel": 0.0, "_inprogress_fuel": 0.0})
-        .withColumn(
-            "total_fuel_consumed_l",
-            _round(col("_completed_fuel") + col("_inprogress_fuel"), 2)
-        )
+    # ── Step 5: join and compute efficiency ────────────────────────────────────
+    return (
+        per_truck_fuel
+        .join(per_truck_metrics, on="truck_id", how="left")
         .withColumn(
             "fuel_per_100km",
             _round(
                 when(col("total_distance_km") > 0,
                     col("total_fuel_consumed_l") / col("total_distance_km") * 100
-                ).otherwise(lit(0.0)), 2
+                ).otherwise(lit(0.0)), 4
             )
         )
-        .drop("_completed_fuel", "_inprogress_fuel")
         .withColumn("stat_date", lit(run_date))
+        .fillna(0.0)
     )
-
-    return result
 
 
 def run(date_from: str, date_to: str, run_date: str):
@@ -142,6 +170,13 @@ def run(date_from: str, date_to: str, run_date: str):
         return
 
     stats = compute_daily_truck_stats(raw, run_date)
+
+    # Debug: show a sample before writing
+    print("  Sample output:")
+    stats.select(
+        "truck_id", "total_distance_km", "total_fuel_consumed_l", "fuel_per_100km"
+    ).show(5, truncate=False)
+
     print(f"  Writing {stats.count()} rows → daily_truck_stats")
     write(stats, "daily_truck_stats", mode="overwrite")
     print("  ✅ Done")
