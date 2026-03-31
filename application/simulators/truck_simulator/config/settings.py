@@ -1,10 +1,11 @@
 import random, os
 
-NUM_TRUCKS = 10
-UPDATE_INTERVAL = 2  # seconds
+NUM_TRUCKS = int(os.getenv("NUM_TRUCKS", "10"))
+UPDATE_INTERVAL = int(os.getenv("UPDATE_INTERVAL", "2"))  # seconds
 
-# Example Morocco cities (lon, lat)
+# Example cities across Africa and Europe (lon, lat)
 CITIES = {
+    # Morocco
     "Casablanca": (-7.5898, 33.5731),
     "Rabat": (-6.8416, 34.0209),
     "Marrakech": (-8.0089, 31.6295),
@@ -24,7 +25,59 @@ CITIES = {
     "Ifrane": (-5.1169, 33.5265),
     "Essaouira": (-9.7594, 31.5085),
     "Ouarzazate": (-6.9094, 30.9333),
-    "Al Hoceima": (-3.9343, 35.2513)
+    "Al Hoceima": (-3.9343, 35.2513),
+    # Africa
+    "Cairo": (31.2357, 30.0444),
+    "Alexandria": (29.9187, 31.2001),
+    "Tunis": (10.1658, 36.8065),
+    "Algiers": (3.0588, 36.7538),
+    "Tripoli": (13.1913, 32.8872),
+    "Dakar": (-17.4467, 14.7167),
+    "Accra": (-0.1870, 5.6037),
+    "Lagos": (3.3792, 6.5244),
+    "Abidjan": (-4.0083, 5.3600),
+    "Nairobi": (36.8219, -1.2921),
+    "Johannesburg": (28.0473, -26.2041),
+    "Cape Town": (18.4241, -33.9249),
+    "Kinshasa": (15.2663, -4.4419),
+    "Luanda": (13.2344, -8.8383),
+    "Dar es Salaam": (39.2083, -6.7924),
+    "Kampala": (32.5825, 0.3476),
+    "Kigali": (30.0587, -1.9441),
+    "Addis Ababa": (38.7578, 9.0320),
+    # Europe
+    "Madrid": (-3.7038, 40.4168),
+    "Barcelona": (2.1734, 41.3851),
+    "Lisbon": (-9.1393, 38.7223),
+    "Porto": (-8.6291, 41.1579),
+    "Paris": (2.3522, 48.8566),
+    "Lyon": (4.8357, 45.7640),
+    "Marseille": (5.3698, 43.2965),
+    "London": (-0.1278, 51.5074),
+    "Manchester": (-2.2426, 53.4808),
+    "Berlin": (13.4050, 52.5200),
+    "Munich": (11.5820, 48.1351),
+    "Hamburg": (9.9937, 53.5511),
+    "Rome": (12.4964, 41.9028),
+    "Milan": (9.1900, 45.4642),
+    "Naples": (14.2681, 40.8518),
+    "Amsterdam": (4.9041, 52.3676),
+    "Rotterdam": (4.4777, 51.9244),
+    "Brussels": (4.3517, 50.8503),
+    "Vienna": (16.3738, 48.2082),
+    "Zurich": (8.5417, 47.3769),
+    "Geneva": (6.1432, 46.2044),
+    "Prague": (14.4378, 50.0755),
+    "Warsaw": (21.0122, 52.2297),
+    "Budapest": (19.0402, 47.4979),
+    "Athens": (23.7275, 37.9838),
+    "Istanbul": (28.9784, 41.0082),
+    "Stockholm": (18.0686, 59.3293),
+    "Oslo": (10.7522, 59.9139),
+    "Copenhagen": (12.5683, 55.6761),
+    "Helsinki": (24.9384, 60.1699),
+    "Dublin": (-6.2603, 53.3498),
+    "Edinburgh": (-3.1883, 55.9533),
 }
 
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "truck-gps")

@@ -5,9 +5,13 @@ from services.route_service import get_route
 from models.truck import Truck
 from services.anomaly import inject_anomaly
 from producers.kafka_producer import send_to_kafka
+from services.validator import validate_and_seed
 
 
 def start_simulation(num_trucks: int):
+    # Validate data and seed if needed before starting simulation
+    if not validate_and_seed():
+        print("⚠️  Starting simulation with potential data inconsistencies")
     city_names = list(CITIES.keys())
     trucks: list[Truck] = []
 

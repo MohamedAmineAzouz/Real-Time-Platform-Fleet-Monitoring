@@ -27,6 +27,50 @@ DDL = [
     AND durable_writes = true
     """,
 
+    # ── drivers ───────────────────────────────────────────────────────────────
+    f"""
+    CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.drivers (
+        driver_id               text,
+        name                    text,
+        license_number          text,
+        phone                   text,
+        status                  text,
+        current_truck_id        int,
+        created_at              timestamp,
+        updated_at              timestamp,
+        PRIMARY KEY (driver_id)
+    )
+    """,
+
+    # ── trucks ────────────────────────────────────────────────────────────────
+    f"""
+    CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.trucks (
+        truck_id                int,
+        license_plate           text,
+        model                   text,
+        year                    int,
+        status                  text,
+        fuel_capacity           double,
+        max_load_kg             double,
+        created_at              timestamp,
+        updated_at              timestamp,
+        PRIMARY KEY (truck_id)
+    )
+    """,
+
+    # ── trajets ───────────────────────────────────────────────────────────────
+    f"""
+    CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.trajets (
+        trajet_id               uuid,
+        start_city              text,
+        end_city                text,
+        distance_km             double,
+        created_at              timestamp,
+        updated_at              timestamp,
+        PRIMARY KEY (trajet_id)
+    )
+    """,
+
     # ── truck_latest ──────────────────────────────────────────────────────────
     f"""
     CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.truck_latest (
@@ -179,7 +223,7 @@ def init_cassandra_schema():
             except Exception:
                 pass   # column already exists — ignore
 
-        print(f"✅ Schema ready — tables: truck_latest, truck_history, alerts")
+        print(f"✅ Schema ready — tables: drivers, trucks, trajets, truck_latest, truck_history, alerts")
     finally:
         cluster.shutdown()
 

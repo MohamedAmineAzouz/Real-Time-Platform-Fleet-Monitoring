@@ -3,3 +3,4 @@ requests
 geopy
 python-dotenv
 kafka-python
+cassandra-driver

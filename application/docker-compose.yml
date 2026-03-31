@@ -13,6 +13,9 @@ services:
     environment:
       KAFKA_BROKER: ${KAFKA_BROKER:-kafka:9092}
       KAFKA_TOPIC:  ${KAFKA_TOPIC:-truck-gps}
+      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
     networks:
       - iot_network
 
