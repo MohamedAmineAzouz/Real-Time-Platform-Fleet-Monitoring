@@ -26,13 +26,9 @@ def start_simulation(num_trucks: int):
     # Get available drivers
     available_drivers = cassandra.get_available_drivers()
 
-    # Get trajets for reference (not assigned in DB since schema doesn't support it)
-    all_trajets = cassandra.get_all_trajets()
-
     print(f"📊 Database state:")
     print(f"   Total trucks: {len(db_trucks)}")
     print(f"   Available drivers: {len(available_drivers)}")
-    print(f"   Available trajets: {len(all_trajets)}")
 
     # Get assigned trucks (trucks that already have drivers)
     assigned_trucks = cassandra.get_assigned_trucks()
@@ -44,11 +40,9 @@ def start_simulation(num_trucks: int):
     for truck_info in db_trucks:
         truck_id = truck_info['truck_id']
         driver_id = None
-        trajet_id = None
 
         # Check if truck already has a driver assigned
         if truck_id in assigned_trucks:
-            # Get the driver from drivers table
             for driver in available_drivers:
                 if driver.get('current_truck_id') == truck_id:
                     driver_id = driver['driver_id']
@@ -60,22 +54,14 @@ def start_simulation(num_trucks: int):
             for driver in available_drivers:
                 if driver['driver_id'] not in used_driver_ids and driver.get('current_truck_id') is None:
                     driver_id = driver['driver_id']
-                    # Assign driver to truck in database
                     cassandra.assign_driver_to_truck(driver_id, truck_id)
                     used_driver_ids.add(driver_id)
                     print(f"  ✅ Assigned driver {driver_id} to truck {truck_id}")
                     break
 
-        # Pick a random trajet for reference (not stored in DB)
-        if all_trajets:
-            trajet = random.choice(all_trajets)
-            trajet_id = trajet['trajet_id']
-            start_city = trajet['start_city']
-            end_city = trajet['end_city']
-        else:
-            # No trajets in database, create random route
-            start_city = random.choice(list(CITIES.keys()))
-            end_city = random.choice([c for c in CITIES.keys() if c != start_city])
+        # Random route
+        start_city = random.choice(list(CITIES.keys()))
+        end_city = random.choice([c for c in CITIES.keys() if c != start_city])
 
         # Get route coordinates
         route = get_route(CITIES[start_city], CITIES[end_city])
@@ -85,8 +71,7 @@ def start_simulation(num_trucks: int):
                 route=route,
                 start_city=start_city,
                 end_city=end_city,
-                driver_id=driver_id,
-                trajet_id=trajet_id
+                driver_id=driver_id
             )
             trucks.append(truck)
         else:
@@ -100,26 +85,23 @@ def start_simulation(num_trucks: int):
         for truck in trucks:
             data = truck.move()
             if data is None:
-                # Truck completed a route - get new route and possibly new driver
-                if truck._needs_driver_change:
+                # Truck completed a route - 30% chance to change driver
+                if random.random() < 0.3:
                     # Release current driver
                     if truck.driver_id:
                         cassandra.release_driver(truck.driver_id)
                         print(f"  👋 Driver {truck.driver_id} released from truck {truck.truck_id}")
 
-                    # Assign new driver (30% chance, or if requested)
+                    # Assign new driver
                     available_drivers = cassandra.get_available_drivers()
                     if available_drivers:
                         for driver in available_drivers:
-                            # Don't reassign the same driver immediately
                             if driver['driver_id'] != truck.driver_id and driver.get('current_truck_id') is None:
                                 new_driver_id = driver['driver_id']
                                 cassandra.assign_driver_to_truck(new_driver_id, truck.truck_id)
                                 truck.driver_id = new_driver_id
                                 print(f"  👋 New driver {new_driver_id} assigned to truck {truck.truck_id}")
                                 break
-
-                    truck.reset_driver_change_flag()
 
                 # Get new route
                 city_names = list(CITIES.keys())
@@ -130,16 +112,6 @@ def start_simulation(num_trucks: int):
                     truck.start_city = truck.end_city
                     truck.end_city = new_end
                     truck.current_index = 0
-
-                    # Create new trajet record
-                    trajet_id = cassandra.create_trajet(
-                        start_city=truck.start_city,
-                        end_city=truck.end_city,
-                        distance_km=0,
-                        truck_id=truck.truck_id,
-                        driver_id=truck.driver_id
-                    )
-                    truck.trajet_id = trajet_id
 
                 continue
 
