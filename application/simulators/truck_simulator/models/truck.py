@@ -18,6 +18,10 @@ ANOMALY_START_CHANCE  = 0.06
 ANOMALY_STOP_CHANCE   = 0.20
 ANOMALY_TYPES         = ["overspeed", "overheat", "fuel_leak"]
 
+# ── Driver change config ──────────────────────────────────────────────────────
+# Chance to change driver after completing a trajet (30% chance)
+DRIVER_CHANGE_CHANCE  = 0.3
+
 
 def _nearest_city(lat: float, lon: float) -> str:
     best_name, best_dist = None, float("inf")
@@ -30,16 +34,17 @@ def _nearest_city(lat: float, lon: float) -> str:
 
 
 class Truck:
-    def __init__(self, truck_id, route, start_city, end_city):
+    def __init__(self, truck_id, route, start_city, end_city, driver_id=None, trajet_id=None):
         self.truck_id      = truck_id
         self.route         = route
         self.current_index = 0
         self.speed         = random.uniform(60, 90)
         self.fuel_level    = random.uniform(75, 100)
         self.engine_temp   = random.uniform(70, 85)
-        self.driver_id     = fake.uuid4()
+        self.driver_id     = driver_id if driver_id else fake.uuid4()
         self.start_city    = start_city
         self.end_city      = end_city
+        self.trajet_id     = trajet_id
         self._odometer_km  = 0.0
 
         # Refuel state
@@ -52,13 +57,27 @@ class Truck:
         self._anomaly_mode: str | None = None
 
         # ── Fuel tracking ─────────────────────────────────────────────────────
-        # fuel_consumed_trip: total fuel consumed (%) since last refuel/start
-        # fuel_refueled:      total fuel added (%) in the current refuel event
-        #                     (0.0 when not refueling, positive during/after refuel)
-        self._trip_fuel_start   = self.fuel_level   # fuel level at trip start
-        self._fuel_consumed_trip = 0.0              # accumulates each tick
-        self._fuel_refueled      = 0.0              # accumulates during refuel ticks
-        self._last_fuel_before_refuel = self.fuel_level  # snapshot when refuel starts
+        self._trip_fuel_start   = self.fuel_level
+        self._fuel_consumed_trip = 0.0
+        self._fuel_refueled      = 0.0
+        self._last_fuel_before_refuel = self.fuel_level
+
+        # ── Driver change tracking ────────────────────────────────────────────
+        self._completed_trajets = 0
+        self._needs_driver_change = False
+
+    def request_driver_change(self):
+        """Mark that this truck needs a new driver."""
+        self._needs_driver_change = True
+
+    def should_change_driver(self) -> bool:
+        """Check if driver should be changed (random chance after trajet completion)."""
+        return self._needs_driver_change or random.random() < DRIVER_CHANGE_CHANCE
+
+    def reset_driver_change_flag(self):
+        """Reset the driver change flag after handling."""
+        self._needs_driver_change = False
+        self._completed_trajets += 1
 
     # ─────────────────────────────────────────────────────────────────────────
     # Route helpers
@@ -102,7 +121,7 @@ class Truck:
         fuel_before     = self.fuel_level
         self.fuel_level = max(0, round(self.fuel_level - fuel_consumed, 3))
 
-        # Accumulate consumed fuel — only positive consumption (not refuel events)
+        # Accumulate consumed fuel
         actual_consumed = round(fuel_before - self.fuel_level, 4)
         if actual_consumed > 0:
             self._fuel_consumed_trip = round(self._fuel_consumed_trip + actual_consumed, 4)
@@ -138,7 +157,6 @@ class Truck:
         self.refuel_city   = _nearest_city(lat, lon)
         self.speed         = 0.0
         self._anomaly_mode = None
-        # Snapshot fuel level at the moment refueling starts
         self._last_fuel_before_refuel = self.fuel_level
         self._fuel_refueled           = 0.0
         print(f"⛽  Truck {self.truck_id} stopping at {self.refuel_city} "
@@ -147,7 +165,6 @@ class Truck:
     def _do_refuel_tick(self):
         fuel_before     = self.fuel_level
         self.fuel_level = min(REFUEL_TARGET, round(self.fuel_level + REFUEL_RATE_PER_TICK, 3))
-        # Accumulate how much fuel was added this tick
         self._fuel_refueled = round(
             self._fuel_refueled + (self.fuel_level - fuel_before), 4
         )
@@ -156,10 +173,8 @@ class Truck:
                   f"(+{self._fuel_refueled:.1f}%) — resuming")
             self.is_refueling = False
             self.refuel_city  = None
-            # Reset trip fuel tracking for the next trip
             self._trip_fuel_start    = self.fuel_level
             self._fuel_consumed_trip = 0.0
-            # Keep _fuel_refueled so the last refueling event carries the total
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public anomaly hooks
@@ -171,7 +186,6 @@ class Truck:
 
     def apply_anomaly_fuel_theft(self, stolen_pct: float):
         self.fuel_level = max(0, round(self.fuel_level - stolen_pct, 3))
-        # Theft is NOT counted in fuel_consumed_trip — it's tracked separately
 
     # ─────────────────────────────────────────────────────────────────────────
     # Main tick
@@ -203,6 +217,11 @@ class Truck:
         # ── CASE 2: Route finished ────────────────────────────────────────────
         if self.current_index >= len(self.route) - 1:
             self._get_new_route()
+            self._completed_trajets += 1
+            # Mark that driver might need to change
+            if self.should_change_driver():
+                self._needs_driver_change = True
+                print(f"  🔄 Truck {self.truck_id} completed trajet - driver change requested")
             return None
 
         # ── CASE 3: Normal movement ───────────────────────────────────────────
