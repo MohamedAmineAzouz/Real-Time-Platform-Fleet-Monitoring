@@ -88,10 +88,14 @@ class Truck:
         new_end    = random.choice(city_names)
         new_route  = get_route(CITIES[self.end_city], CITIES[new_end])
         if new_route:
+            print(f"  🔄 Truck {self.truck_id}: Route {self.start_city} → {self.end_city} completed ({len(self.route)} points)")
+            print(f"     New route: {self.end_city} → {new_end} ({len(new_route)} points)")
             self.route         = new_route
             self.start_city    = self.end_city
             self.end_city      = new_end
             self.current_index = 0
+        else:
+            print(f"  ⚠️  Truck {self.truck_id}: Failed to get new route, keeping current destination")
 
     # ─────────────────────────────────────────────────────────────────────────
     # Anomaly mode state machine

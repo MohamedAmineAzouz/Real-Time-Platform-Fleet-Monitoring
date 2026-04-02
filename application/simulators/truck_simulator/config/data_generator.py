@@ -184,7 +184,7 @@ def init_seed_data():
         # Generate data
         generate_drivers(session, num_drivers)
         generate_trucks(session, NUM_TRUCKS, num_drivers)
-        generate_trajets(session, 10)
+        generate_trajets(session, 100)
 
         print("\n✅ Seed data generation completed!")
         print("=" * 72 + "\n")
