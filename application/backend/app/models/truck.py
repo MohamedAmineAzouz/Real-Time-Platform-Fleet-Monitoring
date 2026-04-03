@@ -39,6 +39,12 @@ class TruckLatest(BaseModel):
     fuel_used:              Optional[float]    = None
     fuel_consumption_rate:  Optional[float]    = None
     high_consumption:       Optional[bool]     = None
+    fuel_consumed_trip:     Optional[float]    = None
+    fuel_refueled:          Optional[float]    = None
+    # Maintenance fields
+    in_maintenance:         Optional[bool]     = None
+    maintenance_type:       Optional[str]      = None
+    maintenance_desc:       Optional[str]      = None
 
 
 class TruckHistory(BaseModel):

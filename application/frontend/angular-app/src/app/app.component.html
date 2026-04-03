@@ -23,6 +23,10 @@
         <span class="chip-val">{{ alertCount }}</span>
         <span class="chip-label">ALERTS</span>
       </div>
+      <div class="stat-chip maintenance" [style.background]="maintenanceCount > 0">
+        <span class="chip-val">{{ maintenanceCount }}</span>
+        <span class="chip-label">MAINTENANCE</span>
+      </div>
       <div class="stat-chip speed">
         <span class="chip-val">{{ avgSpeed }}</span>
         <span class="chip-label">AVG KM/H</span>
@@ -68,7 +72,10 @@
               <span class="truck-icon">🚛</span>
               <span>T-{{ truck.truck_id | number:'2.0-0' }}</span>
             </div>
-            <div class="anomaly-badge" [style.background]="getAlertColor(truck.alert_type)">
+            <div *ngIf="truck.in_maintenance" class="anomaly-badge" style="background: #00b4ff">
+              🔧 MAINTENANCE
+            </div>
+            <div *ngIf="!truck.in_maintenance" class="anomaly-badge" [style.background]="getAlertColor(truck.alert_type)">
               {{ getAlertIcon(truck.alert_type) }}&nbsp;{{ getAlertLabel(truck.alert_type) }}
             </div>
           </div>
@@ -203,6 +210,13 @@
           <div class="detail-item full" *ngIf="selectedTruck.refueling">
             <span class="di-label">⛽ REFUELING</span>
             <span class="di-val small">AT {{ selectedTruck.refuel_city }}</span>
+          </div>
+          <div class="detail-item full" *ngIf="selectedTruck.in_maintenance">
+            <span class="di-label">🔧 MAINTENANCE</span>
+            <span class="di-val small" style="color: #00b4ff">
+              {{ selectedTruck.maintenance_type }}
+            </span>
+            <span class="di-val small">{{ selectedTruck.maintenance_desc }}</span>
           </div>
         </div>
       </div>

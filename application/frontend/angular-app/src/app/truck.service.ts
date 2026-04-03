@@ -26,8 +26,12 @@ export interface Truck {
   fuel_used:              number;
   fuel_consumption_rate:  number;
   high_consumption:       boolean;
-  fuel_consumed_trip:     number;   // ← NEW: total fuel consumed since last refuel (%)
-  fuel_refueled:          number;   // ← NEW: total fuel added in current refuel event (%)
+  fuel_consumed_trip:     number;
+  fuel_refueled:          number;
+  // Maintenance fields (new)
+  in_maintenance:         boolean;
+  maintenance_type:       string | null;
+  maintenance_desc:       string | null;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -214,70 +214,67 @@ class CassandraService:
             return set()
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Trajet operations
+    # Maintenance operations
     # ─────────────────────────────────────────────────────────────────────────
 
-    def get_all_trajets(self) -> List[Dict[str, Any]]:
-        """Get all trajets from database."""
-        query = "SELECT * FROM trajets"
+    def get_all_maintenance_schedules(self) -> dict:
+        """
+        Load maintenance schedules for the CURRENT month only.
+        Returns dict: {truck_id: [{schedule_id, start, end, type, ...}]}
+        Call this once at startup. Refresh monthly (e.g., 1st of each month).
+        """
+        now = datetime.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if now.month == 12:
+            month_end = now.replace(year=now.year + 1, month=1, day=1)
+        else:
+            month_end = now.replace(month=now.month + 1, day=1)
+
+        # Use ALLOW FILTERING since maintenance_schedules has partition key schedule_id
+        query = """
+            SELECT schedule_id, truck_id, maintenance_type, description,
+                   scheduled_start, scheduled_end, assigned_mechanic, cost
+            FROM maintenance_schedules
+            WHERE scheduled_start >= %s AND scheduled_start < %s
+            ALLOW FILTERING
+        """
+
+        schedules = {}
         try:
-            result = self.session.execute(query)
-            trajets = []
+            result = self.session.execute(query, (month_start, month_end))
             for row in result:
-                trajets.append({
-                    'trajet_id': row.trajet_id,
-                    'start_city': row.start_city,
-                    'end_city': row.end_city,
-                    'distance_km': row.distance_km,
+                if row.truck_id not in schedules:
+                    schedules[row.truck_id] = []
+                schedules[row.truck_id].append({
+                    'schedule_id':       row.schedule_id,
+                    'maintenance_type':  row.maintenance_type,
+                    'description':       row.description,
+                    'scheduled_start':   row.scheduled_start,
+                    'scheduled_end':     row.scheduled_end,
+                    'assigned_mechanic': row.assigned_mechanic,
+                    'cost':              row.cost,
                 })
-            return trajets
+            total = sum(len(v) for v in schedules.values())
+            print(f"✅ Loaded {total} maintenance schedules for {len(schedules)} trucks ({now.strftime('%Y-%m')})")
+            return schedules
         except Exception as e:
-            print(f"❌ Error fetching trajets: {e}")
-            return []
+            print(f"❌ Error loading maintenance schedules: {e}")
+            return {}
 
-    def create_trajet(self, start_city: str, end_city: str, distance_km: float,
-                      truck_id: int = None, driver_id: str = None) -> Any:
+    def is_truck_in_maintenance(self, truck_id: int, schedules_cache: dict) -> dict | None:
         """
-        Create a new trajet record.
-        Tries to include truck_id/driver_id if columns exist, otherwise creates without them.
+        Check if a truck is currently under maintenance using CACHED data only.
+        NO database queries. Returns maintenance info if current time is between
+        scheduled_start and scheduled_end.
         """
-        import uuid
-        from cassandra import InvalidRequest
-
-        trajet_id = uuid.uuid4()
         now = datetime.utcnow()
+        truck_schedules = schedules_cache.get(truck_id, [])
 
-        # Try with truck_id and driver_id first
-        query_with_assignment = """
-            INSERT INTO trajets (trajet_id, truck_id, driver_id, start_city, end_city,
-                                distance_km, status, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
+        for sched in truck_schedules:
+            if sched['scheduled_start'] <= now <= sched['scheduled_end']:
+                return sched
 
-        try:
-            self.session.execute(query_with_assignment, (
-                trajet_id, truck_id, driver_id, start_city, end_city,
-                distance_km, 'in_progress', now, now
-            ))
-            return trajet_id
-        except InvalidRequest:
-            # Columns don't exist, try without truck_id/driver_id
-            query_basic = """
-                INSERT INTO trajets (trajet_id, start_city, end_city,
-                                    distance_km, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            try:
-                self.session.execute(query_basic, (
-                    trajet_id, start_city, end_city, distance_km, now, now
-                ))
-                return trajet_id
-            except Exception as e:
-                print(f"❌ Error creating trajet: {e}")
-                return None
-        except Exception as e:
-            print(f"❌ Error creating trajet: {e}")
-            return None
+        return None
 
     def shutdown(self):
         """Close Cassandra connection."""

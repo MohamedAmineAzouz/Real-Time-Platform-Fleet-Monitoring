@@ -116,6 +116,9 @@ DDL = [
         high_consumption        boolean,
         fuel_consumed_trip      double,
         fuel_refueled           double,
+        in_maintenance          boolean,
+        maintenance_type        text,
+        maintenance_desc        text,
         PRIMARY KEY (truck_id)
     )
     """,
@@ -148,6 +151,9 @@ DDL = [
         high_consumption        boolean,
         fuel_consumed_trip      double,
         fuel_refueled           double,
+        in_maintenance          boolean,
+        maintenance_type        text,
+        maintenance_desc        text,
         PRIMARY KEY (truck_id, processed_at)
     ) WITH CLUSTERING ORDER BY (processed_at DESC)
       AND default_time_to_live = 86400
@@ -173,6 +179,9 @@ DDL = [
         fuel_consumption_rate   double,
         fuel_consumed_trip      double,
         fuel_refueled           double,
+        in_maintenance          boolean,
+        maintenance_type        text,
+        maintenance_desc        text,
         PRIMARY KEY ((truck_id, alert_type), processed_at)
     ) WITH CLUSTERING ORDER BY (processed_at DESC)
       AND default_time_to_live = 604800
@@ -189,6 +198,16 @@ ALTER_DDL = [
     f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_history ADD fuel_refueled      double",
     f"ALTER TABLE {CASSANDRA_KEYSPACE}.alerts        ADD fuel_consumed_trip double",
     f"ALTER TABLE {CASSANDRA_KEYSPACE}.alerts        ADD fuel_refueled      double",
+    # Maintenance columns
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_latest  ADD in_maintenance     boolean",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_latest  ADD maintenance_type   text",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_latest  ADD maintenance_desc   text",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_history ADD in_maintenance     boolean",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_history ADD maintenance_type   text",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.truck_history ADD maintenance_desc   text",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.alerts        ADD in_maintenance     boolean",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.alerts        ADD maintenance_type   text",
+    f"ALTER TABLE {CASSANDRA_KEYSPACE}.alerts        ADD maintenance_desc   text",
 ]
 
 

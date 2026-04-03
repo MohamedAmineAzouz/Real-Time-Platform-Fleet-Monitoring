@@ -66,6 +66,12 @@ class Truck:
         self._completed_trajets = 0
         self._needs_driver_change = False
 
+        # ── Maintenance state ─────────────────────────────────────────────────
+        self._in_maintenance = False
+        self._maintenance_info = None
+        self._maintenance_position = None  # GPS position when maintenance started
+        self._maintenance_check_needed = False  # Check maintenance only on route completion
+
     def request_driver_change(self):
         """Mark that this truck needs a new driver."""
         self._needs_driver_change = True
@@ -197,6 +203,33 @@ class Truck:
 
     def move(self) -> dict | None:
 
+        # ── CASE 0: Maintenance ───────────────────────────────────────────────
+        if self._in_maintenance:
+            # Return maintenance status (no movement)
+            return {
+                "truck_id":           self.truck_id,
+                "latitude":           round(self._maintenance_position[0], 6) if self._maintenance_position else 0.0,
+                "longitude":          round(self._maintenance_position[1], 6) if self._maintenance_position else 0.0,
+                "speed":              0.0,
+                "fuel_level":         self.fuel_level,
+                "engine_temp":        round(self.engine_temp, 2),
+                "driver_id":          self.driver_id,
+                "start_city":         self.start_city,
+                "end_city":           self.end_city,
+                "odometer_km":        round(self._odometer_km, 2),
+                "refueling":          False,
+                "refuel_city":        None,
+                "in_maintenance":     True,
+                "maintenance_type":   self._maintenance_info.get('maintenance_type') if self._maintenance_info else None,
+                "maintenance_desc":   self._maintenance_info.get('description') if self._maintenance_info else None,
+                "anomaly":            "none",
+                "theft":              False,
+                "theft_amount":       0.0,
+                "fuel_consumed_trip": round(self._fuel_consumed_trip, 4),
+                "fuel_refueled":      round(self._fuel_refueled, 4),
+                "timestamp":          (datetime.utcnow() + timedelta(hours=1)).isoformat() + "Z",
+            }
+
         # ── CASE 1: Refueling ─────────────────────────────────────────────────
         if self.is_refueling:
             self._do_refuel_tick()
@@ -226,6 +259,8 @@ class Truck:
             if self.should_change_driver():
                 self._needs_driver_change = True
                 print(f"  🔄 Truck {self.truck_id} completed trajet - driver change requested")
+            # Mark to check maintenance status
+            self._maintenance_check_needed = True
             return None
 
         # ── CASE 3: Normal movement ───────────────────────────────────────────

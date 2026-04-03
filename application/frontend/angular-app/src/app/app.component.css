@@ -55,6 +55,7 @@
 }
 .stat-chip.ok    { border-color: rgba(0, 230, 118, 0.3); }
 .stat-chip.alert { border-color: rgba(255, 77, 77, 0.3); }
+.stat-chip.maintenance { border-color: rgba(0, 180, 255, 0.3); }
 .stat-chip.speed { border-color: rgba(0, 180, 255, 0.3); }
 .stat-chip.blink { animation: chipBlink 1s ease-in-out infinite; }
 

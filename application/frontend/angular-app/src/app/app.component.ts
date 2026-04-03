@@ -116,8 +116,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 
-  get normalCount(): number { return this.trucks.filter(t => !t.is_alert).length; }
+  get normalCount(): number { return this.trucks.filter(t => !t.is_alert && !t.in_maintenance).length; }
   get alertCount():  number { return this.trucks.filter(t => t.is_alert).length; }
+  get maintenanceCount(): number { return this.trucks.filter(t => t.in_maintenance).length; }
   get avgSpeed():    number {
     if (!this.trucks.length) return 0;
     return Math.round(this.trucks.reduce((s, t) => s + t.speed, 0) / this.trucks.length);
@@ -226,12 +227,20 @@ export class AppComponent implements OnInit, OnDestroy {
     const now = performance.now();
 
     trucks.forEach(truck => {
-      const color = this.getAlertColor(truck.alert_type);
+      let markerHtml;
+      if (truck.in_maintenance) {
+        markerHtml = `<div class="truck-marker" style="background: #00b4ff; animation: none">
+                        <span>🔧</span>
+                      </div>`;
+      } else {
+        const color = this.getAlertColor(truck.alert_type);
+        markerHtml = `<div class="truck-marker ${truck.is_alert ? 'pulse' : ''}" style="background:${color}">
+                        <span>🚛</span>
+                      </div>`;
+      }
       const icon = L.divIcon({
         className: '',
-        html: `<div class="truck-marker ${truck.is_alert ? 'pulse' : ''}" style="background:${color}">
-                 <span>🚛</span>
-               </div>`,
+        html: markerHtml,
         iconSize: [40, 40],
         iconAnchor: [20, 20]
       });

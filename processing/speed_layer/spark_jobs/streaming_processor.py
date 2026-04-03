@@ -76,6 +76,7 @@ _TELEMETRY_COLS = [
     "alert_type", "is_alert",
     "distance_km", "fuel_used", "fuel_consumption_rate", "high_consumption",
     "fuel_consumed_trip", "fuel_refueled",
+    "in_maintenance", "maintenance_type", "maintenance_desc",
 ]
 
 _ALERT_COLS = [
@@ -119,10 +120,14 @@ def parse_kafka(spark: SparkSession) -> DataFrame:
         StructField("refuel_city",  StringType(),  True),
         StructField("anomaly",      StringType(),  True),
         StructField("theft",        BooleanType(), True),
-        StructField("theft_amount",      DoubleType(),  True),
+        StructField("theft_amount", DoubleType(),  True),
         StructField("fuel_consumed_trip", DoubleType(),  True),
         StructField("fuel_refueled",      DoubleType(),  True),
         StructField("timestamp",           StringType(),  True),
+        # Maintenance fields (new)
+        StructField("in_maintenance", BooleanType(), True),
+        StructField("maintenance_type",   StringType(), True),
+        StructField("maintenance_desc",   StringType(), True),
     ])
 
     raw = (
@@ -243,6 +248,9 @@ def batch_latest(batch_df: DataFrame, batch_id: int):
         .withColumn("fuel_used",             lit(0.0))
         .withColumn("fuel_consumption_rate", lit(0.0))
         .withColumn("high_consumption",      lit(False))
+        .withColumn("in_maintenance",        col("in_maintenance"))
+        .withColumn("maintenance_type",      col("maintenance_type"))
+        .withColumn("maintenance_desc",      col("maintenance_desc"))
         .select(_TELEMETRY_COLS)
         .write
         .format("org.apache.spark.sql.cassandra")
@@ -311,6 +319,9 @@ def batch_alerts(batch_df: DataFrame, batch_id: int):
         alerts
         .withColumn("distance_km",          lit(0.0))
         .withColumn("fuel_consumption_rate", lit(0.0))
+        .withColumn("in_maintenance",        lit(False))
+        .withColumn("maintenance_type",      lit(None))
+        .withColumn("maintenance_desc",      lit(None))
         .select(_ALERT_COLS)
         .write
         .format("org.apache.spark.sql.cassandra")
