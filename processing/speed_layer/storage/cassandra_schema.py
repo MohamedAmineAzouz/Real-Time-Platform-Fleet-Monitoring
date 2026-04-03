@@ -71,6 +71,23 @@ DDL = [
     )
     """,
 
+    # ── maintenance_schedules ─────────────────────────────────────────────────
+    f"""
+    CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.maintenance_schedules (
+        schedule_id             uuid,
+        truck_id                int,
+        maintenance_type        text,
+        description             text,
+        scheduled_start         timestamp,
+        scheduled_end           timestamp,
+        assigned_mechanic       text,
+        cost                    double,
+        created_at              timestamp,
+        updated_at              timestamp,
+        PRIMARY KEY (schedule_id)
+    )
+    """,
+
     # ── truck_latest ──────────────────────────────────────────────────────────
     f"""
     CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.truck_latest (
