@@ -105,8 +105,9 @@ def start_simulation(num_trucks: int):
                 print("✅ Maintenance cache refreshed!\n")
 
         for truck in trucks:
-            # Check maintenance on route completion (uses in-memory cache, NO DB query)
-            if truck._maintenance_check_needed:
+            # Check maintenance on route completion OR while currently in maintenance
+            # (Must keep checking cache to detect when maintenance time ends)
+            if truck._maintenance_check_needed or truck._in_maintenance:
                 maint = cassandra.is_truck_in_maintenance(truck.truck_id, maintenance_cache)
 
                 if maint and not truck._in_maintenance:
