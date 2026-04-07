@@ -186,6 +186,23 @@ DDL = [
     ) WITH CLUSTERING ORDER BY (processed_at DESC)
       AND default_time_to_live = 604800
     """,
+
+    # ── traffic_violations ──────────────────────────────────────────────────
+    # One row per violation. All fields derived from actual truck_history telemetry.
+    # Partitioned by month for efficient monthly reporting.
+    f"""
+    CREATE TABLE IF NOT EXISTS {CASSANDRA_KEYSPACE}.traffic_violations (
+        month_year          text,
+        truck_id            int,
+        violation_id        uuid,
+        violation_type      text,
+        city                text,
+        fine_mad            double,
+        violation_date      date,
+        details             text,
+        PRIMARY KEY ((month_year), truck_id, violation_id)
+    ) WITH CLUSTERING ORDER BY (truck_id ASC, violation_id ASC)
+    """,
 ]
 
 # ── ALTER TABLE for existing deployments ──────────────────────────────────────
@@ -259,7 +276,7 @@ def init_cassandra_schema():
             except Exception:
                 pass   # column already exists — ignore
 
-        print(f"✅ Schema ready — tables: drivers, trucks, trajets, truck_latest, truck_history, alerts")
+        print(f"✅ Schema ready — tables: drivers, trucks, trajets, maintenance_schedules, truck_latest, truck_history, alerts, traffic_violations")
     finally:
         cluster.shutdown()
 
