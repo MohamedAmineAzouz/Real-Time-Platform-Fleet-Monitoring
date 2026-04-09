@@ -6,27 +6,24 @@
 
 services:
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-    ports:
-      - "2181:2181"
-    networks:
-      - iot_network
-
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    depends_on:
-      - zookeeper
     ports:
       - "${KAFKA_PORT:-9092}:9092"
     environment:
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT:-9092}
+      KAFKA_NODE_ID:                        1
+      KAFKA_PROCESS_ROLES:                  broker,controller
+      KAFKA_LISTENERS:                      PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS:           PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS:       1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES:      CONTROLLER
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_LEADER_IMBALANCE_CHECK_INTERVAL_SECONDS: 5
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE:      "true"
+      KAFKA_LOG_DIRS:                       /var/lib/kafka/data
+      CLUSTER_ID:                           "MkU3OEVBNTcwNTJENDM2Qg"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     networks:
       - iot_network
     healthcheck:
@@ -101,6 +98,49 @@ services:
       - iot_network
     restart: on-failure
 
+  # ── Database Migration: Flyway ────────────────────────────────────────────
+  flyway:
+    build:
+      context: ../db
+      dockerfile: Dockerfile
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    command:
+      - migrate
+      - -url=jdbc:cassandra://${CASSANDRA_HOST:-cassandra}:${CASSANDRA_PORT:-9042}?localdatacenter=datacenter1&requesttimeout=30000
+      - -schemas=${CASSANDRA_KEYSPACE:-fleet_dev}
+      - -defaultSchema=${CASSANDRA_KEYSPACE:-fleet_dev}
+      - -locations=filesystem:/flyway/sql
+      - -sqlMigrationSuffixes=.cql
+      - -baselineOnMigrate=true
+      - -connectRetries=10
+    volumes:
+      - ../db/migration:/flyway/sql
+    networks:
+      - iot_network
+    restart: "no"
+
+  # ── Data Seeder: validates & seeds Cassandra after Flyway ─────────────────
+  data-seed:
+    build: ../application/simulators
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+      cassandra:
+        condition: service_healthy
+    environment:
+      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
+      CASSANDRA_USER:     ${CASSANDRA_USER:-cassandra}
+      CASSANDRA_PASSWORD: ${CASSANDRA_PASSWORD:-cassandra}
+      NUM_TRUCKS:         ${NUM_TRUCKS:-10}
+    command: ["python", "-c", "from truck_simulator.services.validator import validate_and_seed; validate_and_seed()"]
+    networks:
+      - iot_network
+    restart: "no"
+
   # ── Speed Layer: Spark Structured Streaming ───────────────────────────────
   speed-layer:
     build: ../processing/speed_layer
@@ -108,11 +148,15 @@ services:
       kafka:
         condition: service_healthy
       kafka-init:
-        condition: service_completed_successfully  
+        condition: service_completed_successfully
       minio:
         condition: service_healthy
       cassandra:
         condition: service_healthy
+      data-seed:
+        condition: service_completed_successfully
+      flyway:                                   # ← add
+        condition: service_completed_successfully
     environment:
       KAFKA_BROKER:    ${KAFKA_BROKER:-kafka:9092}
       KAFKA_TOPIC:     ${KAFKA_TOPIC:-truck-gps}
@@ -143,10 +187,13 @@ services:
     depends_on:
       cassandra:
         condition: service_healthy
+      data-seed:
+        condition: service_completed_successfully
 
 volumes:
   minio-data:
   cassandra-data:
+  kafka-data:
 
 networks:
   iot_network:

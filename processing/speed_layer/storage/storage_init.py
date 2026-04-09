@@ -112,11 +112,6 @@ def _init_gcs():
     print(f"✅ GCS ready — gs://{GCS_BUCKET}")
  
 
-# ── Cassandra ──────────────────────────────────────────────────────────────────
-
-def _init_cassandra():
-    from cassandra_schema import init_cassandra_schema
-    init_cassandra_schema()
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────
@@ -133,9 +128,7 @@ def init_storage():
     else:
         _init_minio()
 
-    # Step 2: Cassandra (same in dev and staging)
-    print("\n[2/2] Cassandra")
-    _init_cassandra()
+
 
     print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("  All storage backends ready")
