@@ -32,8 +32,28 @@ services:
       retries: 10
       start_period: 30s
 
-  # All kafka-topics flags on ONE line — YAML > folds newlines into spaces
-  # which breaks CLI argument parsing (the bug you just hit)
+
+  # ── Kafka Control Center ──────────────────────────────────────────────────
+  control-center:
+    image: confluentinc/cp-enterprise-control-center:7.5.0
+    hostname: control-center
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "9021:9021"
+    environment:
+      CONTROL_CENTER_BOOTSTRAP_SERVERS:       kafka:9092
+      CONTROL_CENTER_REPLICATION_FACTOR:      1
+      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_REPLICATION: 1
+      CONTROL_CENTER_INTERNAL_TOPICS_REPLICATION: 1
+      CONTROL_CENTER_COMMAND_TOPIC_REPLICATION: 1
+      CONTROL_CENTER_METRICS_TOPIC_REPLICATION: 1
+      CONFLUENT_METRICS_TOPIC_REPLICATION:    1
+    networks:
+      - iot_network
+    restart: on-failure
+
   kafka-init:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
@@ -155,7 +175,7 @@ services:
         condition: service_healthy
       data-seed:
         condition: service_completed_successfully
-      flyway:                                   # ← add
+      flyway:
         condition: service_completed_successfully
     environment:
       KAFKA_BROKER:    ${KAFKA_BROKER:-kafka:9092}
