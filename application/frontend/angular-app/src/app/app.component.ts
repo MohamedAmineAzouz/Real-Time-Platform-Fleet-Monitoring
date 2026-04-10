@@ -391,6 +391,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private getCityCoords(cityName: string): [number, number] | null {
     const cities: Record<string, [number, number]> = {
+      // Morocco
       'Casablanca': [33.5731, -7.5898], 'Rabat':      [34.0209, -6.8416],
       'Marrakech':  [31.6295, -8.0089], 'Tanger':     [35.7595, -5.8126],
       'Agadir':     [30.4278, -9.5981], 'Fes':        [34.0346, -4.9806],
@@ -400,7 +401,24 @@ export class AppComponent implements OnInit, OnDestroy {
       'Tetouan':    [35.5713, -5.3689], 'Beni Mellal':[32.3378, -6.3700],
       'Khouribga':  [33.6111, -6.9058], 'Settat':     [33.0113, -7.6111],
       'Ifrane':     [33.5265, -5.1169], 'Essaouira':  [31.5085, -9.7594],
-      'Ouarzazate': [30.9333, -6.9094], 'Al Hoceima': [35.2513, -3.9343]
+      'Ouarzazate': [30.9333, -6.9094], 'Al Hoceima': [35.2513, -3.9343],
+      'Taza':       [34.2133, -4.0103], 'Berkane':    [34.9186, -2.3222],
+      'Sidi Kacem': [34.2214, -5.7089], 'Sidi Slimane':[34.2667, -5.9267],
+      'Ksar El Kebir':[35.0017, -5.9089], 'Larache':  [35.1933, -6.1561],
+      'Asilah':     [35.4653, -6.0344], 'Chefchaouen':[35.1689, -5.2689],
+      'Ouazzane':   [34.7989, -5.5789], 'Fnideq':     [35.8500, -5.3667],
+      "M'diq":      [35.6833, -5.3167], 'Martil':     [35.6167, -5.2756],
+      'Castillejos':[35.7667, -5.3500], 'Khenifra':   [32.9333, -5.6667],
+      // Africa
+      'Cairo':        [30.0444, 31.2357], 'Alexandria': [31.2001, 29.9187],
+      'Tunis':        [36.8065, 10.1658], 'Algiers':    [36.7538, 3.0588],
+      'Tripoli':      [32.8872, 13.1913], 'Dakar':      [14.7167, -17.4467],
+      'Accra':        [5.6037, -0.1870],  'Lagos':      [6.5244, 3.3792],
+      'Abidjan':      [5.3600, -4.0083],  'Nairobi':    [-1.2921, 36.8219],
+      'Johannesburg': [-26.2041, 28.0473],'Cape Town':  [-33.9249, 18.4241],
+      'Kinshasa':     [-4.4419, 15.2663], 'Luanda':     [-8.8383, 13.2344],
+      'Dar es Salaam':[-6.7924, 39.2083], 'Kampala':    [0.3476, 32.5825],
+      'Kigali':       [-1.9441, 30.0587], 'Addis Ababa':[9.0320, 38.7578],
     };
     return cities[cityName] || null;
   }
