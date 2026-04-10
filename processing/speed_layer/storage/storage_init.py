@@ -128,8 +128,6 @@ def init_storage():
     else:
         _init_minio()
 
-
-
     print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("  All storage backends ready")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
