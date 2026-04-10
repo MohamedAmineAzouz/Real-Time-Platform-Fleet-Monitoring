@@ -6,14 +6,17 @@ Airflow 3 Compatible.
 ─────────────────────────────────────────────────────────────────────────────
 """
 
-import random
+import random, os
 from datetime import datetime, timedelta
 
 from airflow.sdk import dag, task
 
 # ── Configuration ─────────────────────────────────────────────────────────
-CASSANDRA_HOST = "cassandra"
-CASSANDRA_KEYSPACE = "fleet_dev"
+CASSANDRA_HOST     = os.getenv("CASSANDRA_HOST",     "cassandra")
+CASSANDRA_PORT     = os.getenv("CASSANDRA_PORT",     "9042")
+CASSANDRA_KEYSPACE = os.getenv("CASSANDRA_KEYSPACE", "fleet")
+CASSANDRA_USER     = os.getenv("CASSANDRA_USER",     "")
+CASSANDRA_PASS     = os.getenv("CASSANDRA_PASS",     "")
 
 # Data pools
 CITIES = ["Casablanca", "Rabat", "Marrakech", "Tanger", "Agadir", "Fes", "Oujda", "Meknes"]
@@ -28,11 +31,19 @@ END_DATE = datetime(2026, 4, 1)
 def generate_march_history():
     """Connect to Cassandra and insert realistic truck history for March."""
     from cassandra.cluster import Cluster
-    from cassandra.policies import RoundRobinPolicy
+    from cassandra.auth import PlainTextAuthProvider
 
     print(f"🚀 Starting data generation for {START_DATE.strftime('%Y-%m')}...")
 
-    cluster = Cluster([CASSANDRA_HOST], load_balancing_policy=RoundRobinPolicy())
+    auth = PlainTextAuthProvider(CASSANDRA_USER, CASSANDRA_PASS) if CASSANDRA_USER else None
+
+    cluster = Cluster(
+        [CASSANDRA_HOST],
+        port=int(CASSANDRA_PORT),
+        auth_provider=auth,
+        connect_timeout=10,
+    )
+    
     session = cluster.connect()
     session.set_keyspace(CASSANDRA_KEYSPACE)
 
