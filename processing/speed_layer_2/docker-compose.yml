@@ -11,6 +11,11 @@ services:
       - "4040:4040"   # Spark application UI
     environment:
       - SPARK_MODE=master
+      - CASSANDRA_HOST=cassandra
+      - CASSANDRA_PORT=9042
+      - CASSANDRA_KEYSPACE=fleet_1
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_TOPIC=truck-gps-staging-1
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     volumes:
       - spark-data:/opt/spark/work-dir
@@ -29,6 +34,11 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=2g
       - SPARK_WORKER_CORES=2
+      - CASSANDRA_HOST=cassandra
+      - CASSANDRA_PORT=9042
+      - CASSANDRA_KEYSPACE=fleet_1
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_TOPIC=truck-gps-staging-1
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
       spark://spark-master:7077
@@ -47,6 +57,11 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=2g
       - SPARK_WORKER_CORES=2
+      - CASSANDRA_HOST=cassandra
+      - CASSANDRA_PORT=9042
+      - CASSANDRA_KEYSPACE=fleet_1
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_TOPIC=truck-gps-staging-1
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
       spark://spark-master:7077
