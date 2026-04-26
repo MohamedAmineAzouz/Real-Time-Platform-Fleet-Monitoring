@@ -211,25 +211,22 @@ services:
         condition: service_completed_successfully
 
   # ── Portainer: Container Management UI ─────────────────────────────────────
-  # portainer:
-  #   image: portainer/portainer-ce:latest
-  #   container_name: portainer
-  #   ports:
-  #     - "9002:9002"   # Portainer web UI
-  #     - "8002:8000"   # Portainer agent (optional, for edge agents)
-  #   volumes:
-  #     - portainer_data:/data
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #   networks:
-  #     - iot_network
-  #   restart: unless-stopped
-  #   command: --admin-password='${PORTAINER_ADMIN_PASSWORD:-admin}'
+  portainer:
+    image: portainer/portainer-ce:alpine
+    container_name: portainer
+    command: -H unix:///var/run/docker.sock
+    ports:
+      - "9003:9000"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "portainer_data:/data"
+    restart: always
 
 volumes:
   minio-data:
   cassandra-data:
   kafka-data:
-  # portainer_data:
+  portainer_data:
 
 networks:
   iot_network:
