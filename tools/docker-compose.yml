@@ -31,6 +31,7 @@ services:
       interval: 15s
       retries: 10
       start_period: 30s
+    restart: on-failure
 
 
   # ── Kafka Control Center ──────────────────────────────────────────────────
@@ -83,6 +84,7 @@ services:
       interval: 10s
       retries: 8
       start_period: 10s
+    restart: on-failure
 
   # ── Storage Layer: Cassandra ──────────────────────────────────────────────
   cassandra:

@@ -115,10 +115,14 @@ def calculate_trajectory_distance(df):
 
 
 # ── Write to Cassandra ─────────────────────────────────────────────────────────
+TRUCK_HISTORY_TABLE = "truck_history"
+ALERTS_TABLE        = "alerts"
+
 def write_to_cassandra(batch_df, batch_id: int):
     """
     Write latest state per truck to Cassandra.
     Uses dropDuplicates to keep latest record per truck (streaming-compatible).
+    Also inserts into truck_history (all records) and alerts (alert records only).
     """
     import time
     t0 = time.time()
@@ -151,7 +155,7 @@ def write_to_cassandra(batch_df, batch_id: int):
         .select(columns)
     )
 
-    # Write to Cassandra
+    # Write to truck_latest
     (final_df.write
         .format("org.apache.spark.sql.cassandra")
         .mode("append")
@@ -159,8 +163,50 @@ def write_to_cassandra(batch_df, batch_id: int):
         .save()
     )
 
+    # Write ALL records to truck_history (full history, TTL = 1 day)
+    history_columns = [
+        "truck_id", "processed_at", "event_time",
+        "latitude", "longitude", "speed", "fuel_level", "engine_temp",
+        "driver_id", "start_city", "end_city", "odometer_km",
+        "refueling", "refuel_city", "anomaly", "theft", "theft_amount",
+        "distance_km", "fuel_used", "fuel_consumption_rate", "high_consumption",
+        "fuel_consumed_trip", "fuel_refueled",
+        "alert_type", "is_alert",
+        "in_maintenance", "maintenance_type", "maintenance_desc"
+    ]
+    history_df = final_df.select(history_columns)
+    (history_df.write
+        .format("org.apache.spark.sql.cassandra")
+        .mode("append")
+        .options(table=TRUCK_HISTORY_TABLE, keyspace=CASSANDRA_KEYSPACE)
+        .save()
+    )
+
+    # Write only alert records to alerts table
+    alert_columns = [
+        "truck_id", "alert_type", "processed_at", "event_time",
+        "latitude", "longitude", "speed", "fuel_level", "engine_temp",
+        "driver_id", "anomaly", "theft", "theft_amount",
+        "distance_km", "fuel_consumption_rate", "fuel_consumed_trip", "fuel_refueled",
+        "in_maintenance", "maintenance_type", "maintenance_desc"
+    ]
+    alerts_df = (final_df
+        .filter(col("is_alert") == True)
+        .select(alert_columns)
+    )
+
+    if not alerts_df.rdd.isEmpty():
+        (alerts_df.write
+            .format("org.apache.spark.sql.cassandra")
+            .mode("append")
+            .options(table=ALERTS_TABLE, keyspace=CASSANDRA_KEYSPACE)
+            .save()
+        )
+
     count = final_df.count()
-    print(f"[batch #{batch_id:05d}] ✅  Wrote {count} truck(s) to {CASSANDRA_KEYSPACE}.{CASSANDRA_TABLE}  ({time.time()-t0:.2f}s)")
+    alert_count = alerts_df.count() if not alerts_df.rdd.isEmpty() else 0
+    print(f"[batch #{batch_id:05d}] ✅ Wrote {count} truck(s) to {CASSANDRA_KEYSPACE}.{CASSANDRA_TABLE}, "
+          f"{count} to {TRUCK_HISTORY_TABLE}, {alert_count} alerts to {ALERTS_TABLE}  ({time.time()-t0:.2f}s)")
 
 
 # ── Main Processing ────────────────────────────────────────────────────────────
