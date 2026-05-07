@@ -18,6 +18,7 @@ services:
       CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
     networks:
       - iot_network
+    restart: on-failure
 
   backend:
     build: ./backend
