@@ -24,7 +24,6 @@ from pyspark.sql.functions import (
 
 # ── Configuration (Hardcoded to avoid import errors in Spark cluster) ───────
 CASSANDRA_KEYSPACE = os.getenv("CASSANDRA_KEYSPACE", "fleet")
-CASSANDRA_PACKAGE  = "com.datastax.spark:spark-cassandra-connector_2.12:3.4.1"
 
 SPEED_LIMIT = 120.0
 BASE_LAMBDA = 0.35

@@ -38,6 +38,7 @@ services:
       --conf spark.cassandra.connection.host=${CASSANDRA_HOST:-cassandra}
       --conf spark.cassandra.connection.port=${CASSANDRA_PORT:-9042}
       --conf spark.jars.ivy=/home/spark/.ivy2
+      --total-executor-cores 4
       /opt/spark/work-dir/streaming_processor.py
 
       wait

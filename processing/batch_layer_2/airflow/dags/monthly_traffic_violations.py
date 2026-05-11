@@ -11,7 +11,7 @@ from airflow.sdk import dag, task
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
-# ── Configuration (All from env vars - NO UI setup) ───────────────────────
+
 SPARK_CONN_ID = os.getenv("SPARK_CONN_ID", "spark_default")
 CASSANDRA_HOST = os.getenv("CASSANDRA_HOST", "cassandra")
 CASSANDRA_PORT = os.getenv("CASSANDRA_PORT", "9042")
@@ -24,7 +24,7 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_traffic_violations.py"
     description="Generate realistic traffic violations based on last month's actual driving telemetry",
     default_args={
         "owner": "fleet-team",
-        "retries": 2,
+        "retries": 0,
         "retry_delay": timedelta(minutes=1),
         "execution_timeout": timedelta(hours=2),
     },
@@ -40,10 +40,6 @@ def monthly_traffic_violations_dag():
 
     @task
     def calc_dates(**context):
-        print(SPARK_CONN_ID)
-        print(CASSANDRA_HOST)
-        print(CASSANDRA_PORT)
-        print(CASSANDRA_KEYSPACE)
         """Calculate previous month date range using logical_date (Airflow 3.x)"""
         logical_date = context["logical_date"]
         first_current = logical_date.replace(day=1)
@@ -55,41 +51,42 @@ def monthly_traffic_violations_dag():
 
     date_range = calc_dates()
 
-    # ✅ Spark Submit - Cluster Mode (NO env_vars, NO master param)
     run_violations_job = SparkSubmitOperator(
         task_id="run_violations_spark_job",
         application=SPARK_JOB_PATH,
-        conn_id=SPARK_CONN_ID,  # ✅ Defined via AIRFLOW_CONN_SPARK_DEFAULT env var
-        deploy_mode="client",  # ✅ Driver runs on Spark worker
+        conn_id=SPARK_CONN_ID,
+        deploy_mode="client",
         name="traffic_violations_batch",
-        # ✅ Pass Spark configs via conf (NOT env_vars)
+
         conf={
             "spark.cassandra.connection.host": CASSANDRA_HOST,
             "spark.cassandra.connection.port": CASSANDRA_PORT,
-            "spark.driver.memory": "2g",
-            "spark.executor.memory": "2g",
-            "spark.executor.cores": "2",
-            "spark.sql.shuffle.partitions": "8",
-            # ✅ Pass CASSANDRA_KEYSPACE via spark.executor.env (works in cluster mode)
+            "spark.driver.memory": "1g",
+            "spark.executor.memory": "1g",
+            "spark.executor.cores": "1",
+            "spark.cores.max": "2",
+            "spark.sql.shuffle.partitions": "4",
+
             "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
             "spark.driver.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
+            "spark.jars.packages": "com.datastax.spark:spark-cassandra-connector_2.12:3.4.1",
         },
-        # ✅ Jinja templating to pull XCom values for date args
+
         application_args=[
             "{{ ti.xcom_pull(task_ids='calc_dates')['start_date'] }}",
             "{{ ti.xcom_pull(task_ids='calc_dates')['end_date'] }}",
         ],
         verbose=True,
-        # ❌ REMOVED: env_vars={...} - NOT supported in cluster mode
+
     )
 
     post_process = EmptyOperator(task_id="violations_post_process", trigger_rule="all_success")
     end = EmptyOperator(task_id="violations_complete", trigger_rule="all_done")
 
-    # ✅ Define dependencies
+
     start >> date_range >> run_violations_job >> post_process >> end
-    run_violations_job >> end  # Allow end to run even if post_process fails
+    run_violations_job >> end  
 
 
-# ✅ Register DAG (call once at module level)
+
 monthly_traffic_violations_dag()

@@ -105,20 +105,22 @@ services:
       interval: 20s
       retries: 15
       start_period: 60s
-  # ── Cassandra UI (cassandra-web) ──────────────────────────────────────────
-  cassandra-ui:
-    image: ipushc/cassandra-web:latest
+
+
+  dbgate:
+    image: dbgate/dbgate:latest
+    container_name: dbgate
+    restart: always
+    ports:
+      - "3001:3000"
+    volumes:
+      - dbgate_data:/root/.dbgate
+    networks:
+      - iot_network
     depends_on:
       cassandra:
         condition: service_healthy
-    ports:
-      - "3001:8083"
-    environment:
-      CASSANDRA_HOST: cassandra
-      CASSANDRA_PORT: "9042"
-    networks:
-      - iot_network
-    restart: on-failure
+
 
   # ── Database Migration: Flyway ────────────────────────────────────────────
   flyway:
@@ -229,6 +231,7 @@ volumes:
   cassandra-data:
   kafka-data:
   portainer_data:
+  dbgate_data:
 
 networks:
   iot_network:
