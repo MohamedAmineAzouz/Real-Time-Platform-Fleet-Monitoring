@@ -69,7 +69,7 @@ def monthly_traffic_violations_dag():
 
             "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
             "spark.driver.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
-            "spark.jars.packages": "com.datastax.spark:spark-cassandra-connector_2.12:3.4.1",
+            "spark.jars.packages": "com.datastax.spark:spark-cassandra-connector_2.12:3.5.0",
         },
 
         application_args=[

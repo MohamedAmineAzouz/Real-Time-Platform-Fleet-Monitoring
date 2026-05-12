@@ -18,8 +18,9 @@ import random
 import uuid
 import math
 from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, TimestampType
 from pyspark.sql.functions import (
-    col, when, max as _max, collect_list, struct, date_trunc, coalesce, lit
+    col, when, max as _max, collect_list, struct, date_trunc, coalesce, lit, to_date
 )
 
 # ── Configuration (Hardcoded to avoid import errors in Spark cluster) ───────
@@ -201,7 +202,7 @@ def run_violations_job(spark, start_date, end_date):
         print("✅ No realistic violations generated (normal for professional fleets)")
         return
 
-    df_out = spark.createDataFrame(violations_data)
+    schema = StructType([StructField('month_year', StringType(), False), StructField('truck_id', IntegerType(), False), StructField('violation_id', StringType(), False), StructField('violation_type', StringType(), False), StructField('city', StringType(), True), StructField('fine_mad', DoubleType(), False), StructField('violation_date', TimestampType(), False), StructField('details', StringType(), True)]); df_out = spark.createDataFrame(violations_data, schema); df_out = df_out.withColumn('violation_date', df_out['violation_date'].cast('date'))
     print(f"💾 Writing {len(violations_data)} violation records to Cassandra...")
 
     df_out.write \

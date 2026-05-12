@@ -40,14 +40,12 @@
 #     pyspark==3.5.1
 
 
-FROM apache/airflow:3.2.1
+FROM apache/airflow:3.2.1-python3.11
 
-# Install Java (required for Spark)
 USER root
 RUN apt-get update && apt-get install -y openjdk-17-jdk-headless curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Spark
 ARG SPARK_VERSION=3.5.1
 ARG HADOOP_VERSION=3
 RUN curl -fSL "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" \
@@ -58,11 +56,8 @@ RUN curl -fSL "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spar
 RUN chmod -R 755 /opt/spark && \
     chown -R airflow:root /opt/spark
 
-# Add Spark to PATH
 ENV PATH="/opt/spark/bin:$PATH"
 ENV SPARK_HOME=/opt/spark
 
-# Install Python deps
 USER airflow
 RUN pip install --no-cache-dir apache-airflow-providers-apache-spark minio
-
