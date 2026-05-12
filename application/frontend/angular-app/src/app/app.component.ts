@@ -409,16 +409,6 @@ export class AppComponent implements OnInit, OnDestroy {
       'Ouazzane':   [34.7989, -5.5789], 'Fnideq':     [35.8500, -5.3667],
       "M'diq":      [35.6833, -5.3167], 'Martil':     [35.6167, -5.2756],
       'Castillejos':[35.7667, -5.3500], 'Khenifra':   [32.9333, -5.6667],
-      // Africa
-      'Cairo':        [30.0444, 31.2357], 'Alexandria': [31.2001, 29.9187],
-      'Tunis':        [36.8065, 10.1658], 'Algiers':    [36.7538, 3.0588],
-      'Tripoli':      [32.8872, 13.1913], 'Dakar':      [14.7167, -17.4467],
-      'Accra':        [5.6037, -0.1870],  'Lagos':      [6.5244, 3.3792],
-      'Abidjan':      [5.3600, -4.0083],  'Nairobi':    [-1.2921, 36.8219],
-      'Johannesburg': [-26.2041, 28.0473],'Cape Town':  [-33.9249, 18.4241],
-      'Kinshasa':     [-4.4419, 15.2663], 'Luanda':     [-8.8383, 13.2344],
-      'Dar es Salaam':[-6.7924, 39.2083], 'Kampala':    [0.3476, 32.5825],
-      'Kigali':       [-1.9441, 30.0587], 'Addis Ababa':[9.0320, 38.7578],
     };
     return cities[cityName] || null;
   }
