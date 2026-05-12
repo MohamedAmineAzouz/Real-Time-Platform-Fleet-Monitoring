@@ -214,6 +214,28 @@ class CassandraService:
             return set()
 
     # ─────────────────────────────────────────────────────────────────────────
+    # Trajet operations
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def get_all_trajets(self) -> List[Dict[str, Any]]:
+        """Get all available trajets from database."""
+        query = "SELECT trajet_id, start_city, end_city, distance_km FROM trajets"
+        try:
+            result = self.session.execute(query)
+            trajets = []
+            for row in result:
+                trajets.append({
+                    'trajet_id': row.trajet_id,
+                    'start_city': row.start_city,
+                    'end_city': row.end_city,
+                    'distance_km': row.distance_km,
+                })
+            return trajets
+        except Exception as e:
+            print(f"❌ Error fetching trajets: {e}")
+            return []
+
+    # ─────────────────────────────────────────────────────────────────────────
     # Maintenance operations
     # ─────────────────────────────────────────────────────────────────────────
 

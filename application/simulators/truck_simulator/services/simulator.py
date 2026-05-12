@@ -1,12 +1,12 @@
 import time
 import random
 from datetime import datetime, timedelta
-from config.settings import CITIES, UPDATE_INTERVAL
 from services.route_service import get_route
 from models.truck import Truck
 from services.anomaly import inject_anomaly
 from producers.kafka_producer import send_to_kafka
 from services.cassandra_service import get_cassandra_service
+from config.settings import CITIES, UPDATE_INTERVAL
 
 
 def start_simulation(num_trucks: int):
@@ -24,9 +24,16 @@ def start_simulation(num_trucks: int):
     # Get available drivers
     available_drivers = cassandra.get_available_drivers()
 
+    # Get all trajets from database
+    db_trajets = cassandra.get_all_trajets()
+    if not db_trajets:
+        print("❌ No trajets found in database. Exiting.")
+        return
+
     print(f"📊 Database state:")
     print(f"   Total trucks: {len(db_trucks)}")
     print(f"   Available drivers: {len(available_drivers)}")
+    print(f"   Available trajets: {len(db_trajets)}")
 
     # Get assigned trucks (trucks that already have drivers)
     assigned_trucks = cassandra.get_assigned_trucks()
@@ -62,26 +69,37 @@ def start_simulation(num_trucks: int):
                     print(f"  ✅ Assigned driver {driver_id} to truck {truck_id}")
                     break
 
-        # Random route
-        start_city = random.choice(list(CITIES.keys()))
-        end_city = random.choice([c for c in CITIES.keys() if c != start_city])
+        # ── Pick a random trajet from DB ──
+        trajet = random.choice(db_trajets)
+        start_city = trajet['start_city']
+        end_city = trajet['end_city']
+        trajet_id = trajet['trajet_id']
 
-        # Get route coordinates
-        route = get_route(CITIES[start_city], CITIES[end_city])
+        # Get route coordinates (Requires CITIES mapping for coords)
+        # Note: If CITIES in settings doesn't match DB cities, this might fail
+        start_coords = CITIES.get(start_city)
+        end_coords = CITIES.get(end_city)
+
+        if not start_coords or not end_coords:
+            print(f"⚠️  City '{start_city}' or '{end_city}' not found in settings. Skipping truck {truck_id}")
+            continue
+
+        route = get_route(start_coords, end_coords)
         if route:
             truck = Truck(
                 truck_id=truck_id,
                 route=route,
                 start_city=start_city,
                 end_city=end_city,
-                driver_id=driver_id
+                driver_id=driver_id,
+                trajet_id=trajet_id
             )
             truck._maintenance_check_needed = True  # Check on first tick
             trucks.append(truck)
         else:
-            print(f"⚠️  Could not get route for truck {truck_id}, skipping")
+            print(f"⚠️  Could not get route for trajet {trajet_id} ({start_city} -> {end_city}), skipping truck {truck_id}")
 
-    print(f"\n✅ Started {len(trucks)} trucks with drivers from database")
+    print(f"\n✅ Started {len(trucks)} trucks with drivers and trajets from database")
     print("=" * 72 + "\n")
 
     # Main simulation loop
@@ -154,6 +172,7 @@ def start_simulation(num_trucks: int):
                 maint_tag = " 🔧 MAINTENANCE"
                 print(
                     f"{data['timestamp']} | "
+                    f"start city: {truck.start_city} → end city: {truck.end_city} | "
                     f"Truck {data['truck_id']:>2} | "
                     f"{data['speed']:>6.1f} km/h | "
                     f"fuel {data['fuel_level']:>5.1f}% | "
@@ -186,14 +205,15 @@ def start_simulation(num_trucks: int):
                 # Check maintenance status when route completes
                 truck._maintenance_check_needed = True
 
-                # Get new route
-                city_names = list(CITIES.keys())
-                new_end = random.choice(city_names)
-                new_route = get_route(CITIES[truck.end_city], CITIES[new_end])
+                # ── Get NEW trajet from DB ──
+                new_trajet = random.choice(db_trajets)
+                new_route = get_route(CITIES[new_trajet['start_city']], CITIES[new_trajet['end_city']])
                 if new_route:
+                    print(f"  🔄 Truck {truck.truck_id} starting new DB trajet: {new_trajet['start_city']} -> {new_trajet['end_city']}")
                     truck.route = new_route
-                    truck.start_city = truck.end_city
-                    truck.end_city = new_end
+                    truck.start_city = new_trajet['start_city']
+                    truck.end_city = new_trajet['end_city']
+                    truck.trajet_id = new_trajet['trajet_id']
                     truck.current_index = 0
 
                 continue
@@ -205,6 +225,7 @@ def start_simulation(num_trucks: int):
             maint_tag = " 🔧 MAINTENANCE" if data.get("in_maintenance") else ""
             print(
                 f"{data['timestamp']} | "
+                f"start city: {truck.start_city} → end city: {truck.end_city} | "
                 f"Truck {data['truck_id']:>2} | "
                 f"{data['speed']:>6.1f} km/h | "
                 f"fuel {data['fuel_level']:>5.1f}% | "

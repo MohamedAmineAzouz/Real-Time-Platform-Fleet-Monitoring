@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import ( col, lit, when, from_json, current_timestamp, to_timestamp, to_date)
+from pyspark.sql.functions import ( col, lit, when, from_json, current_timestamp, to_timestamp, to_date, expr)
 from config import *
 from schemas import get_truck_schema
 from cassandra_writer import write_to_cassandra
@@ -69,7 +69,7 @@ def main():
 
     enriched = (
       parsed
-      .withColumn("processed_at", current_timestamp())
+      .withColumn("processed_at", current_timestamp() + expr("INTERVAL 1 HOUR"))
       .withColumn("event_time", to_timestamp("timestamp"))
       .withColumn("event_date", to_date("event_time"))
       .withColumn("distance_km", col("odometer_km"))
