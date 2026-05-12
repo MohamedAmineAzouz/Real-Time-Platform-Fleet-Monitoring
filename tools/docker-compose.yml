@@ -166,37 +166,37 @@ services:
     restart: "no"
 
   # ── Speed Layer: Spark Structured Streaming ───────────────────────────────
-  speed-layer:
-    build: ../processing/speed_layer
-    depends_on:
-      kafka:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-      minio:
-        condition: service_healthy
-      cassandra:
-        condition: service_healthy
-      data-seed:
-        condition: service_completed_successfully
-      flyway:
-        condition: service_completed_successfully
-    environment:
-      KAFKA_BROKER:    ${KAFKA_BROKER:-kafka:9092}
-      KAFKA_TOPIC:     ${KAFKA_TOPIC:-truck-gps}
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
-      MINIO_ENDPOINT:  ${MINIO_ENDPOINT:-http://minio:9000}
-      MINIO_ACCESS:    ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET:    ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET:    ${MINIO_BUCKET:-fleet-data}
-      GCS_BUCKET:      ${GCS_BUCKET:-}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
-      CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
-      CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
-      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
-    networks:
-      - iot_network
-    restart: on-failure
+  # speed-layer:
+  #   build: ../processing/speed_layer
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+  #     kafka-init:
+  #       condition: service_completed_successfully
+  #     minio:
+  #       condition: service_healthy
+  #     cassandra:
+  #       condition: service_healthy
+  #     data-seed:
+  #       condition: service_completed_successfully
+  #     flyway:
+  #       condition: service_completed_successfully
+  #   environment:
+  #     KAFKA_BROKER:    ${KAFKA_BROKER:-kafka:9092}
+  #     KAFKA_TOPIC:     ${KAFKA_TOPIC:-truck-gps}
+  #     STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
+  #     MINIO_ENDPOINT:  ${MINIO_ENDPOINT:-http://minio:9000}
+  #     MINIO_ACCESS:    ${MINIO_ROOT_USER:-minioadmin}
+  #     MINIO_SECRET:    ${MINIO_ROOT_PASSWORD:-minioadmin}
+  #     MINIO_BUCKET:    ${MINIO_BUCKET:-fleet-data}
+  #     GCS_BUCKET:      ${GCS_BUCKET:-}
+  #     GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+  #     CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
+  #     CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
+  #     CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
+  #   networks:
+  #     - iot_network
+  #   restart: on-failure
 
   streamlit:
     build: ../processing/streamlit
