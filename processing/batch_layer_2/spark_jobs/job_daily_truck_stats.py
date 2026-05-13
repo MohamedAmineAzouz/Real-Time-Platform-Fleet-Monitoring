@@ -32,70 +32,39 @@ S3_PATH = f"s3a://{LAKE_BUCKET}/{LAKE_PREFIX}"
 
 def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date: str) -> DataFrame:
     """
-    Core logic for daily truck statistics.
-    1. Segment driving events by refueling cycles.
-    2. Convert fuel percentage to liters using truck capacity.
-    3. Aggregate all metrics per truck per day.
+    Simplified core logic for daily truck statistics.
+    Sum deltas for distance and fuel, and calculate time metrics.
     """
     
-    # ── Join with Truck Registry ──────────────────────────────────────────
-    # We need fuel_capacity to convert % to L
-    df = telemetry_df.join(trucks_df.select("truck_id", "fuel_capacity"), "truck_id", "left")
-    
-    # ── Step 1: Identify trip segments ────────────────────────────────────
-    # A new segment starts when refueling transitions from True to False
+    # Window to calculate time deltas between events
     w_truck = Window.partitionBy("truck_id").orderBy("event_time")
     
-    segmented = (
-        df
-        .withColumn("prev_refueling", lag("refueling", 1, False).over(w_truck))
+    # Calculate duration between events in seconds
+    with_time_deltas = (
+        telemetry_df
+        .withColumn("prev_event_time", lag("event_time", 1).over(w_truck))
         .withColumn(
-            "segment_start",
-            when(
-                (col("prev_refueling") == True) & (col("refueling") == False),
-                lit(1)
+            "duration_sec",
+            when(col("prev_event_time").isNotNull(),
+                col("event_time").cast("long") - col("prev_event_time").cast("long")
             ).otherwise(lit(0))
         )
-        .withColumn(
-            "trip_segment",
-            _sum("segment_start").over(w_truck.rowsBetween(Window.unboundedPreceding, 0))
-        )
+        # Cap duration at 10 minutes to avoid spikes from gaps in telemetry
+        .withColumn("duration_sec", when(col("duration_sec") > 600, lit(600)).otherwise(col("duration_sec")))
     )
     
-    # ── Step 2: Calculate Fuel Consumed in Liters ──────────────────────────
-    # fuel_consumed_trip is a running percentage (%) since last refuel.
-    # total_fuel_l = (max(fuel_consumed_trip) / 100) * fuel_capacity
-    
-    driving = segmented.filter(col("refueling") == False)
-    
-    per_segment = (
-        driving
-        .groupBy("truck_id", "trip_segment", "fuel_capacity")
-        .agg(
-            _max("fuel_consumed_trip").alias("segment_fuel_pct"),
-            _sum("distance_km").alias("segment_distance_km"),
-        )
-        .withColumn(
-            "segment_fuel_l",
-            (col("segment_fuel_pct") / 100.0) * coalesce(col("fuel_capacity"), lit(400.0))
-        )
-    )
-    
-    # ── Step 3: Aggregate Segments per Truck ──────────────────────────────
-    per_truck_fuel = (
-        per_segment
+    # ── Step 1: Sum Deltas per Truck ──────────────────────────────────────
+    per_truck_deltas = (
+        with_time_deltas
         .groupBy("truck_id")
         .agg(
-            _round(_sum("segment_fuel_l"), 2).alias("total_fuel_consumed_l"),
-            _round(_sum("segment_distance_km"), 2).alias("total_distance_km"),
-        )
-    )
-    
-    # ── Step 4: Other Metrics (Speed, Alerts, Events) ─────────────────────
-    per_truck_metrics = (
-        driving
-        .groupBy("truck_id")
-        .agg(
+            _round(_sum("fuel_consumed_l"), 2).alias("total_fuel_consumed_l"),
+            _round(_sum("distance_km"), 2).alias("total_distance_km"),
+            
+            # Time Metrics
+            _round(_sum(when(col("speed") > 2.0, col("duration_sec")).otherwise(0)) / 3600.0, 2).alias("hours_driven"),
+            _round(_sum(when(col("speed") <= 2.0, col("duration_sec")).otherwise(0)) / 3600.0, 2).alias("hours_stopped"),
+            
             _round(avg("speed"), 2).alias("avg_speed_kmh"),
             _round(_max("speed"), 2).alias("max_speed_kmh"),
             _sum(when(col("is_alert") == True, 1).otherwise(0)).alias("total_alerts"),
@@ -103,14 +72,13 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
             _sum(when(col("alert_type") == "OVERHEAT", 1).otherwise(0)).alias("overheat_count"),
             _sum(when(col("alert_type") == "FUEL_THEFT", 1).otherwise(0)).alias("fuel_theft_count"),
             _sum(when(col("alert_type") == "LOW_FUEL", 1).otherwise(0)).alias("low_fuel_count"),
-            count("*").alias("event_count"),
+            count("*").alias("event_count")
         )
     )
     
-    # ── Step 5: Final Join and Efficiency Calculation ──────────────────────
+    # ── Step 2: Efficiency Calculation ────────────────────────────────────
     final_stats = (
-        per_truck_fuel
-        .join(per_truck_metrics, on="truck_id", how="left")
+        per_truck_deltas
         .withColumn(
             "fuel_per_100km",
             _round(

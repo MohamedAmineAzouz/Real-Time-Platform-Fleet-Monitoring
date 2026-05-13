@@ -72,7 +72,7 @@ def main():
       .withColumn("processed_at", current_timestamp() + expr("INTERVAL 1 HOUR"))
       .withColumn("event_time", to_timestamp("timestamp"))
       .withColumn("event_date", to_date("event_time"))
-      .withColumn("distance_km", col("odometer_km"))
+      .withColumn("distance_km", col("distance_km"))
     )
 
     with_alerts = classify_alert(enriched)
