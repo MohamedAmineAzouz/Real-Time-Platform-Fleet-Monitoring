@@ -18,6 +18,9 @@ ANOMALY_START_CHANCE  = 0.06
 ANOMALY_STOP_CHANCE   = 0.20
 ANOMALY_TYPES         = ["overspeed", "overheat", "fuel_leak"]
 
+# Realistic fuel leak: 0.02% to 0.08% per tick (~0.08 to 0.32 L per tick)
+LEAK_RATE_RANGE       = (0.02, 0.08)
+
 # ── Driver change config ──────────────────────────────────────────────────────
 DRIVER_CHANGE_CHANCE  = 0.3
 
@@ -302,6 +305,7 @@ class Truck:
                 "theft_amount":       0.0,
                 "fuel_consumed_trip": round(self._fuel_consumed_trip, 4),
                 "fuel_refueled":      round(self._fuel_refueled, 4),
+                "_anomaly_mode":      self._anomaly_mode,
                 "timestamp":          (now + timedelta(hours=1)).isoformat() + "Z",
             }
 
@@ -357,6 +361,7 @@ class Truck:
                 "refuel_city":        self.refuel_city,
                 "fuel_consumed_trip": round(self._fuel_consumed_trip, 4),
                 "fuel_refueled":      round(self._fuel_refueled, 4),
+                "_anomaly_mode":      self._anomaly_mode,
                 "timestamp":          (now + timedelta(hours=1)).isoformat() + "Z",
             }
 
@@ -405,5 +410,6 @@ class Truck:
             "refuel_city":        self.refuel_city,
             "fuel_consumed_trip": round(self._fuel_consumed_trip, 4),
             "fuel_refueled":      round(self._fuel_refueled, 4),
+            "_anomaly_mode":      self._anomaly_mode,
             "timestamp":          (now + timedelta(hours=1)).isoformat() + "Z",
         }
