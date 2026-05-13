@@ -21,4 +21,3 @@ while producer is None:
 
 def send_to_kafka(data):
     producer.send(KAFKA_TOPIC, data)
-    producer.flush()

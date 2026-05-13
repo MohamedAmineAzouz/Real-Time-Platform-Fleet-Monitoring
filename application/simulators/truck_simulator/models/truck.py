@@ -235,10 +235,18 @@ class Truck:
         elif self._anomaly_mode == "overheat":
             self.engine_temp = round(random.uniform(103, 135), 2)
         elif self._anomaly_mode == "fuel_leak":
-            extra_drain = round(random.uniform(3.0, 7.0), 3)
-            self.fuel_level = max(0, round(self.fuel_level - extra_drain, 3))
-            self._fuel_consumed_trip = round(self._fuel_consumed_trip + extra_drain, 4)
-            self._last_tick_fuel_l += round(extra_drain * 4, 2)
+            # Leak is a percentage of total tank (400L)
+            leak_pct = round(random.uniform(*LEAK_RATE_RANGE), 4)
+            
+            # Ensure we don't leak more than we have
+            actual_leak_pct = min(leak_pct, self.fuel_level)
+            
+            self.fuel_level = max(0, round(self.fuel_level - actual_leak_pct, 3))
+            self._fuel_consumed_trip = round(self._fuel_consumed_trip + actual_leak_pct, 4)
+            
+            # Convert percentage to liters (assuming 400L capacity)
+            leak_liters = round(actual_leak_pct * 4, 4)
+            self._last_tick_fuel_l = round(self._last_tick_fuel_l + leak_liters, 4)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public anomaly hooks
@@ -246,13 +254,15 @@ class Truck:
 
     def apply_anomaly_fuel_drain(self, extra_pct: float):
         if not (self.is_resting or self.is_refueling or self._in_maintenance):
-            self.fuel_level = max(0, round(self.fuel_level - extra_pct, 3))
-            self._fuel_consumed_trip = round(self._fuel_consumed_trip + extra_pct, 4)
-            self._last_tick_fuel_l += round(extra_pct * 4, 2)
+            actual_drain = min(extra_pct, self.fuel_level)
+            self.fuel_level = max(0, round(self.fuel_level - actual_drain, 3))
+            self._fuel_consumed_trip = round(self._fuel_consumed_trip + actual_drain, 4)
+            self._last_tick_fuel_l = round(self._last_tick_fuel_l + (actual_drain * 4), 4)
 
     def apply_anomaly_fuel_theft(self, stolen_pct: float):
-        self.fuel_level = max(0, round(self.fuel_level - stolen_pct, 3))
-        self._last_tick_fuel_l += round(stolen_pct * 4, 2)
+        actual_stolen = min(stolen_pct, self.fuel_level)
+        self.fuel_level = max(0, round(self.fuel_level - actual_stolen, 3))
+        # Theft is NOT added to _last_tick_fuel_l as it's not consumption
 
     # ─────────────────────────────────────────────────────────────────────────
     # Main tick
