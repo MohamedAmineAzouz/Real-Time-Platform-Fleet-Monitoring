@@ -20,10 +20,6 @@ def write_to_cassandra(batch_df, batch_id: int):
         return
 
     deduped = batch_df.dropDuplicates(["truck_id"])
-    # deduped = deduped.withColumn(
-    #     "event_date",
-    #     to_date("event_time")
-    # )
     
     # Select only the columns needed for truck_latest, truck_history
     columns = [
@@ -32,7 +28,7 @@ def write_to_cassandra(batch_df, batch_id: int):
         "driver_id", "start_city", "end_city", "odometer_km",
         "refueling", "refuel_city", "anomaly", "theft", "theft_amount",
         "distance_km", "fuel_used", "fuel_consumption_rate", "high_consumption",
-        "fuel_consumed_trip", "fuel_refueled",
+        "fuel_consumed_trip", "fuel_consumed_l", "fuel_refueled",
         "alert_type", "is_alert",
         "in_maintenance", "maintenance_type", "maintenance_desc"
     ]
@@ -68,7 +64,7 @@ def write_to_cassandra(batch_df, batch_id: int):
         "truck_id", "alert_type", "processed_at", "event_time",
         "latitude", "longitude", "speed", "fuel_level", "engine_temp",
         "driver_id", "anomaly", "theft", "theft_amount",
-        "distance_km", "fuel_consumption_rate", "fuel_consumed_trip", "fuel_refueled",
+        "distance_km", "fuel_consumption_rate", "fuel_consumed_trip", "fuel_consumed_l", "fuel_refueled",
         "in_maintenance", "maintenance_type", "maintenance_desc"
     ]
     
