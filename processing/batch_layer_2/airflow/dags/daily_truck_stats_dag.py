@@ -92,7 +92,7 @@ def daily_truck_stats_dag():
             
             # Resource Allocation
             "spark.driver.memory": "1g",
-            "spark.executor.memory": "2g",
+            "spark.executor.memory": "1g",
             "spark.executor.cores": "1",
             "spark.sql.shuffle.partitions": "10",
             

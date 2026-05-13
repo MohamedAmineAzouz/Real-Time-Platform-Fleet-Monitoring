@@ -80,6 +80,17 @@ x-airflow-common:
     CASSANDRA_HOST:       ${CASSANDRA_HOST:-cassandra}
     CASSANDRA_PORT:       ${CASSANDRA_PORT:-9042}
     CASSANDRA_KEYSPACE:   ${CASSANDRA_KEYSPACE:-fleet}
+    LAKE_BUCKET:          ${LAKE_BUCKET:-fleet-data}
+    LAKE_PREFIX:          ${LAKE_PREFIX:-silver/truck_history}
+    STORAGE_BACKEND:      ${STORAGE_BACKEND:-minio}
+    MINIO_ENDPOINT:       ${MINIO_ENDPOINT:-http://minio:9000}
+    MINIO_ACCESS:         ${MINIO_ROOT_USER:-minioadmin}
+    MINIO_SECRET:         ${MINIO_ROOT_PASSWORD:-minioadmin}
+    MINIO_BUCKET:         ${MINIO_BUCKET:-fleet-data-dev}
+    GCS_BUCKET:           ${GCS_BUCKET:-}
+    BIGQUERY_PROJECT:     ${BIGQUERY_PROJECT:-}
+    BIGQUERY_DATASET:     ${BIGQUERY_DATASET:-fleet_analytics}
+    GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
