@@ -13,6 +13,9 @@ def inject_anomaly(data: dict, truck) -> dict:
         return data
 
     anomaly = data.pop("_anomaly_mode", "none")
+    if anomaly is None:
+        anomaly = "none"
+        
     theft_event = False
 
     if data["fuel_level"] > 5 and random.random() < THEFT_CHANCE:

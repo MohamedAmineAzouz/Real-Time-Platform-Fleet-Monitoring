@@ -337,7 +337,8 @@ class Truck:
                 "theft":              False,
                 "theft_amount":       0.0,
                 "fuel_consumed_trip": round(self._fuel_consumed_trip, 4),
-                "fuel_refueled":      0.0,
+                "fuel_refueled":      round(self._fuel_refueled, 4),
+                "_anomaly_mode":      self._anomaly_mode,
                 "timestamp":          (now + timedelta(hours=1)).isoformat() + "Z",
             }
 

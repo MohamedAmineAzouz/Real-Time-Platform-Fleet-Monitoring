@@ -205,7 +205,7 @@ class CassandraService:
 
     def get_assigned_trucks(self) -> set:
         """Get set of truck IDs that have drivers assigned."""
-        query = "SELECT current_truck_id FROM drivers WHERE current_truck_id IS NOT NULL ALLOW FILTERING"
+        query = "SELECT current_truck_id FROM drivers"
         try:
             result = self.session.execute(query)
             return {row.current_truck_id for row in result if row.current_truck_id is not None}
