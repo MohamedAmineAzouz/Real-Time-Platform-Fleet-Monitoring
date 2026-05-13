@@ -162,6 +162,36 @@ class Truck:
             self._driving_time_since_last_rest = timedelta(0)
 
     # ─────────────────────────────────────────────────────────────────────────
+    # Route helpers
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _get_new_route(self):
+        city_names = list(CITIES.keys())
+        new_end    = random.choice(city_names)
+        new_route  = get_route(CITIES[self.end_city], CITIES[new_end])
+        if new_route:
+            print(f"  🔄 Truck {self.truck_id}: Route {self.start_city} → {self.end_city} completed ({len(self.route)} points)")
+            print(f"     New route: {self.end_city} → {new_end} ({len(new_route)} points)")
+            self.route         = new_route
+            self.start_city    = self.end_city
+            self.end_city      = new_end
+            self.current_index = 0
+        else:
+            print(f"  ⚠️  Truck {self.truck_id}: Failed to get new route, keeping current destination")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Anomaly mode state machine
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _tick_anomaly_mode(self):
+        if self._anomaly_mode is None:
+            if random.random() < ANOMALY_START_CHANCE:
+                self._anomaly_mode = random.choice(ANOMALY_TYPES)
+        else:
+            if random.random() < ANOMALY_STOP_CHANCE:
+                self._anomaly_mode = None
+
+    # ─────────────────────────────────────────────────────────────────────────
     # Physics
     # ─────────────────────────────────────────────────────────────────────────
 
