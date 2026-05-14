@@ -21,8 +21,9 @@ def start_simulation(num_trucks: int):
         print("❌ No trucks found in database. Exiting.")
         return
 
-    # Get available drivers
-    available_drivers = cassandra.get_available_drivers()
+    # Get ALL drivers to recover state from previous runs
+    all_drivers = cassandra.get_all_drivers()
+    available_drivers = [d for d in all_drivers if d['status'] in ('available', 'resting')]
 
     # Get all trajets from database
     db_trajets = cassandra.get_all_trajets()
@@ -51,22 +52,23 @@ def start_simulation(num_trucks: int):
         truck_id = truck_info['truck_id']
         driver_id = None
 
-        # Check if truck already has a driver assigned
+        # 1. First, check if ANY driver (even if on_trip) is already assigned to this truck
         if truck_id in assigned_trucks:
-            for driver in available_drivers:
+            for driver in all_drivers:
                 if driver.get('current_truck_id') == truck_id:
                     driver_id = driver['driver_id']
                     used_driver_ids.add(driver_id)
+                    print(f"  ✅ Recovered driver {driver_id} for truck {truck_id} (status: {driver['status']})")
                     break
 
-        # If no driver assigned, try to assign one
+        # 2. If no driver recovered, try to assign an available one
         if not driver_id and available_drivers:
             for driver in available_drivers:
-                if driver['driver_id'] not in used_driver_ids and driver.get('current_truck_id') is None:
+                if driver['driver_id'] not in used_driver_ids:
                     driver_id = driver['driver_id']
                     cassandra.assign_driver_to_truck(driver_id, truck_id)
                     used_driver_ids.add(driver_id)
-                    print(f"  ✅ Assigned driver {driver_id} to truck {truck_id}")
+                    print(f"  ✅ Assigned new driver {driver_id} to truck {truck_id}")
                     break
 
         # ── Pick a random trajet from DB ──
@@ -186,8 +188,8 @@ def start_simulation(num_trucks: int):
             if data is None:
                 # Truck completed a route - 30% chance to change driver
                 if random.random() < 0.3:
-                    # Release current driver
-                    if truck.driver_id:
+                    # Release current driver - ONLY if it's a real driver from the registry
+                    if truck.driver_id and str(truck.driver_id).startswith("DRV-"):
                         cassandra.release_driver(truck.driver_id)
                         print(f"  👋 Driver {truck.driver_id} released from truck {truck.truck_id}")
 

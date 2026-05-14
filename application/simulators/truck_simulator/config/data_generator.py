@@ -27,17 +27,16 @@ CASSANDRA_PASS     = os.getenv("CASSANDRA_PASS",     "")
 
 # Sample data pools
 FIRST_NAMES = [
-    "Ahmed", "Mohammed", "Fatima", "Ali", "Omar", "Hassan", "Ibrahim", "Youssef",
+    "Ahmed", "Mohammed", "Ali", "Omar", "Hassan", "Ibrahim", "Youssef",
     "Karim", "Saïd", "Rachid", "Mustafa", "Khalid", "Abdallah", "Hamza", "Mehdi",
-    "Jean", "Pierre", "Michel", "François", "Luis", "Carlos", "Antonio", "Miguel",
-    "Thomas", "Michael", "David", "James", "Robert", "John", "William", "Richard"
+    "amine", "yassine", "abdellah", "abdessamad", "younes", "hicham", "mohcine",
+    "ismail", "nabil", "sami", "adnane",
 ]
 
 LAST_NAMES = [
     "El Amrani", "Benali", "Idrissi", "Bennani", "Tazi", "Fassi", "Ouazzani", "Chakir",
     "Berrada", "Kabbaj", "Ghazali", "Naciri", "Iraqi", "Alaoui", "Mernissi", "Tahiri",
-    "Dupont", "Martin", "Bernard", "Petit", "Garcia", "Rodriguez", "Lopez", "Fernandez",
-    "Smith", "Johnson", "Williams", "Brown", "Jones", "Davis", "Miller", "Wilson"
+    "Azouz", "El Yacoubi"
 ]
 
 TRUCK_MODELS = [

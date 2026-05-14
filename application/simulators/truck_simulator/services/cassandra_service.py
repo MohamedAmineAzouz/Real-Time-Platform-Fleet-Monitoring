@@ -208,10 +208,12 @@ class CassandraService:
         query = "SELECT current_truck_id FROM drivers"
         try:
             result = self.session.execute(query)
+            # Filter in Python to avoid unsupported Cassandra restriction
             return {row.current_truck_id for row in result if row.current_truck_id is not None}
         except Exception as e:
             print(f"❌ Error fetching assigned trucks: {e}")
             return set()
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # Trajet operations
