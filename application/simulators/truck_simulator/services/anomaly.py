@@ -1,8 +1,8 @@
 import random
 
 # ── Fuel-theft event (still random, independent) ──────────────────────────────
-THEFT_CHANCE       = 0.004
-THEFT_AMOUNT_RANGE = (8, 20)
+THEFT_CHANCE       = 0.0003
+THEFT_AMOUNT_RANGE = (0.8, 2.5)
 
 
 def inject_anomaly(data: dict, truck) -> dict:
@@ -18,7 +18,7 @@ def inject_anomaly(data: dict, truck) -> dict:
         
     theft_event = False
 
-    if data["fuel_level"] > 5 and random.random() < THEFT_CHANCE:
+    if data["speed"] <= 2.0 and data["fuel_level"] > 5 and random.random() < THEFT_CHANCE:
         stolen = round(random.uniform(*THEFT_AMOUNT_RANGE), 2)
         stolen = min(stolen, data["fuel_level"] - 1)
         truck.apply_anomaly_fuel_theft(stolen)

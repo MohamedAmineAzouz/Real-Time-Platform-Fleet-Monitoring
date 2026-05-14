@@ -15,9 +15,8 @@ import os
 import sys
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
-    col, sum as _sum, avg, max as _max, count,
-    round as _round, to_date, lit, when,
-    lag, coalesce
+    col, sum as _sum, max as _max, count,
+    round as _round, to_date, lit, when, lag
 )
 from pyspark.sql.window import Window
 
@@ -65,7 +64,6 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
             _round(_sum(when(col("speed") > 2.0, col("duration_sec")).otherwise(0)) / 3600.0, 2).alias("hours_driven"),
             _round(_sum(when(col("speed") <= 2.0, col("duration_sec")).otherwise(0)) / 3600.0, 2).alias("hours_stopped"),
             
-            _round(avg("speed"), 2).alias("avg_speed_kmh"),
             _round(_max("speed"), 2).alias("max_speed_kmh"),
             _sum(when(col("is_alert") == True, 1).otherwise(0)).alias("total_alerts"),
             _sum(when(col("alert_type") == "OVERSPEED", 1).otherwise(0)).alias("overspeed_count"),
@@ -79,6 +77,16 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
     # ── Step 2: Efficiency Calculation ────────────────────────────────────
     final_stats = (
         per_truck_deltas
+        .withColumn(
+            "avg_speed_kmh",
+            _round(
+                when(
+                    col("hours_driven") > 0,
+                    col("total_distance_km") / col("hours_driven")
+                ).otherwise(lit(0.0)),
+                2
+            )
+        )
         .withColumn(
             "fuel_per_100km",
             _round(

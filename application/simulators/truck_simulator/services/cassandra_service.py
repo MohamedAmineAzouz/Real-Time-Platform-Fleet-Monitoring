@@ -171,6 +171,8 @@ class CassandraService:
                     'model': row.model,
                     'year': row.year,
                     'status': row.status,
+                    'fuel_capacity': row.fuel_capacity,
+                    'max_load_kg': row.max_load_kg,
                 })
             return trucks
         except Exception as e:
@@ -189,6 +191,8 @@ class CassandraService:
                     'license_plate': row.license_plate,
                     'model': row.model,
                     'status': row.status,
+                    'fuel_capacity': row.fuel_capacity,
+                    'max_load_kg': row.max_load_kg,
                 }
             return None
         except Exception as e:
