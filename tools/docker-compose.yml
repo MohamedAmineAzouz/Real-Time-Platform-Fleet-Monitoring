@@ -199,7 +199,7 @@ services:
   #   restart: on-failure
 
   streamlit:
-    build: ../processing/streamlit
+    build: ../processing/streamlit_v2
     ports:
       - "8501:8501"
     environment:

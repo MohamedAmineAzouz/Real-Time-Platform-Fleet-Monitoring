@@ -1,0 +1,261 @@
+.stApp {
+    background:
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 26%),
+        radial-gradient(circle at left top, rgba(34, 197, 94, 0.08), transparent 22%),
+        __APP_BG__;
+    color: __TEXT__;
+    font-family: "Aptos", "Segoe UI Variable", "Segoe UI", sans-serif;
+}
+
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, __CARD_ALT__ 0%, __CARD_BG__ 100%);
+    border-right: 1px solid __BORDER__;
+}
+
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+}
+
+.brand-shell {
+    display: flex;
+    gap: 0.9rem;
+    align-items: center;
+    padding: 1rem 1rem 1.1rem 1rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, __CARD_BG__ 0%, __CARD_ALT__ 100%);
+    border: 1px solid __BORDER__;
+    border-radius: 18px;
+    box-shadow: __SHADOW__;
+}
+
+.brand-badge {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, __ACCENT__ 0%, __ACCENT_ALT__ 100%);
+    color: white;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.brand-eyebrow,
+.page-overline {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+    color: __MUTED__;
+}
+
+.brand-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: __TEXT__;
+}
+
+.brand-subtitle,
+.sidebar-card-subtitle,
+.section-caption,
+.kpi-caption,
+.table-caption,
+.content-card-copy,
+.footer-shell {
+    color: __MUTED__;
+}
+
+.sidebar-card,
+.kpi-card,
+.content-card,
+.status-banner,
+.table-shell,
+.empty-state {
+    background: linear-gradient(180deg, __CARD_BG__ 0%, __CARD_ALT__ 100%);
+    border: 1px solid __BORDER__;
+    border-radius: 18px;
+    box-shadow: __SHADOW__;
+}
+
+.sidebar-card {
+    padding: 0.95rem 1rem;
+    margin-top: 0.8rem;
+}
+
+.sidebar-card-title,
+.kpi-label,
+.table-title,
+.content-card-title {
+    font-size: 0.82rem;
+    color: __MUTED__;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.sidebar-card-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: __TEXT__;
+    margin-top: 0.35rem;
+}
+
+.page-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 1.35rem 1.45rem;
+    margin-bottom: 1.35rem;
+    background: linear-gradient(135deg, __CARD_BG__ 0%, rgba(2, 132, 199, 0.12) 100%);
+    border: 1px solid __BORDER__;
+    border-radius: 24px;
+    box-shadow: __SHADOW__;
+}
+
+.page-hero h1 {
+    margin: 0.2rem 0 0.4rem 0;
+    color: __TEXT__;
+    font-size: 2rem;
+}
+
+.page-hero p {
+    margin: 0;
+    max-width: 64rem;
+    color: __MUTED__;
+    line-height: 1.5;
+}
+
+.page-hero-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.tag-chip {
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    color: __TEXT__;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
+}
+
+.section-heading {
+    margin: 1.2rem 0 0.8rem 0;
+}
+
+.section-title {
+    color: __TEXT__;
+    font-size: 1.08rem;
+    font-weight: 700;
+}
+
+.kpi-card {
+    padding: 1rem 1rem 1.05rem 1rem;
+    min-height: 9.5rem;
+}
+
+.kpi-card.tone-primary {
+    border-color: rgba(56, 189, 248, 0.22);
+}
+
+.kpi-card.tone-warning {
+    border-color: rgba(245, 158, 11, 0.24);
+}
+
+.kpi-card.tone-danger {
+    border-color: rgba(239, 68, 68, 0.24);
+}
+
+.kpi-value {
+    font-size: 1.72rem;
+    font-weight: 700;
+    color: __TEXT__;
+    margin-top: 0.45rem;
+}
+
+.kpi-delta {
+    margin-top: 0.55rem;
+    color: __ACCENT__;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.status-banner {
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.status-banner.tone-success {
+    border-left: 4px solid __ACCENT__;
+}
+
+.status-banner.tone-warning {
+    border-left: 4px solid __WARNING__;
+}
+
+.status-banner.tone-info {
+    border-left: 4px solid __ACCENT_ALT__;
+}
+
+.table-shell {
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.7rem;
+}
+
+.content-card {
+    padding: 1.2rem 1.25rem;
+    min-height: 18rem;
+}
+
+.content-list {
+    margin: 0.8rem 0 0 1rem;
+    color: __TEXT__;
+    line-height: 1.6;
+}
+
+.content-list li {
+    margin-bottom: 0.25rem;
+}
+
+.empty-state {
+    padding: 1.4rem;
+    text-align: center;
+}
+
+.empty-state-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: __TEXT__;
+    margin-bottom: 0.35rem;
+}
+
+.empty-state-message {
+    color: __MUTED__;
+}
+
+.footer-shell {
+    text-align: center;
+    padding: 1.5rem 0 0.5rem 0;
+    font-size: 0.84rem;
+}
+
+.stDownloadButton button,
+.stButton button {
+    border-radius: 12px;
+    border: 1px solid __BORDER__;
+    background: linear-gradient(135deg, __CARD_BG__ 0%, __CARD_ALT__ 100%);
+    color: __TEXT__;
+    font-weight: 600;
+}
+
+.stSelectbox label,
+.stMultiSelect label,
+.stSlider label,
+.stDateInput label,
+.stToggle label {
+    color: __MUTED__;
+    font-weight: 600;
+}
