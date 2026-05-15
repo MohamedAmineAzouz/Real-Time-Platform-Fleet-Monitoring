@@ -1,4 +1,4 @@
-"""Reusable Plotly chart builders for the analytics platform."""
+"""Advanced Plotly visualizations for the fleet command center."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from config.settings import get_settings
-from utils.theme import get_palette, plotly_axis_style
+from utils.theme import get_palette, get_plotly_tokens
 
 
 settings = get_settings()
@@ -16,265 +16,457 @@ settings = get_settings()
 
 def _empty_figure(title: str, theme_mode: str, message: str = "No data available for the selected scope.") -> go.Figure:
     fig = go.Figure()
-    fig.add_annotation(text=message, showarrow=False, font={"size": 14})
+    fig.add_annotation(
+        text=message,
+        showarrow=False,
+        x=0.5,
+        y=0.5,
+        xref="paper",
+        yref="paper",
+        font={"size": 14},
+    )
     fig.update_layout(title=title)
-    return finalize_figure(fig, theme_mode)
+    return _style_figure(fig, theme_mode)
 
 
-def finalize_figure(fig: go.Figure, theme_mode: str, height: int | None = None) -> go.Figure:
-    axis_style = plotly_axis_style(theme_mode)
+def _style_figure(fig: go.Figure, theme_mode: str, height: int | None = None) -> go.Figure:
+    tokens = get_plotly_tokens(theme_mode)
     fig.update_layout(
-        paper_bgcolor=axis_style["paper_bgcolor"],
-        plot_bgcolor=axis_style["plot_bgcolor"],
-        font={"family": "Aptos, Segoe UI, sans-serif", "color": axis_style["font_color"], "size": 13},
-        margin={"l": 24, "r": 24, "t": 60, "b": 24},
-        height=height or settings.default_chart_height,
+        paper_bgcolor=tokens["paper_bgcolor"],
+        plot_bgcolor=tokens["plot_bgcolor"],
+        font={"family": "IBM Plex Sans, Segoe UI, sans-serif", "color": tokens["font_color"], "size": 13},
+        margin={"l": 18, "r": 18, "t": 54, "b": 18},
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
         hoverlabel={"font_size": 12},
+        height=height or settings.default_chart_height,
     )
-    fig.update_xaxes(showgrid=True, gridcolor=axis_style["gridcolor"], zerolinecolor=axis_style["zerolinecolor"])
-    fig.update_yaxes(showgrid=True, gridcolor=axis_style["gridcolor"], zerolinecolor=axis_style["zerolinecolor"])
+    fig.update_xaxes(showgrid=True, gridcolor=tokens["gridcolor"], linecolor=tokens["linecolor"])
+    fig.update_yaxes(showgrid=True, gridcolor=tokens["gridcolor"], linecolor=tokens["linecolor"])
     return fig
 
 
-def create_indicator_gauge(
-    value: float,
-    title: str,
-    theme_mode: str,
-    max_value: float,
-    suffix: str,
-    threshold: float,
-) -> go.Figure:
+def speed_distribution_chart(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Speed Distribution", theme_mode)
     palette = get_palette(theme_mode)
+    fig = px.histogram(
+        snapshot,
+        x="speed",
+        color="severity",
+        nbins=18,
+        marginal="box",
+        title="Live Speed Distribution and Severity Spread",
+        color_discrete_map={
+            "Normal": palette["accent"],
+            "Medium": palette["warning"],
+            "High": palette["accent_alt"],
+            "Critical": palette["danger"],
+        },
+    )
+    fig.update_layout(bargap=0.08)
+    return _style_figure(fig, theme_mode)
+
+
+def speed_timeline_chart(truck_timeline: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if truck_timeline.empty:
+        return _empty_figure("Speed Timeline", theme_mode)
+    scoped = truck_timeline.copy()
+    scoped["buffer_captured_at"] = pd.to_datetime(scoped["buffer_captured_at"], errors="coerce")
+    order = (
+        scoped.sort_values("buffer_captured_at")
+        .groupby("truck_id")
+        .tail(1)
+        .sort_values("speed", ascending=False)["truck_id"]
+        .head(6)
+        .tolist()
+    )
+    scoped = scoped[scoped["truck_id"].isin(order)] if order else scoped
+    fig = px.line(
+        scoped,
+        x="buffer_captured_at",
+        y="speed",
+        color="truck_label",
+        markers=True,
+        title="Live Speed Trend by Truck",
+        hover_data={"fuel_level": ":.1f", "engine_temp": ":.1f"},
+    )
+    return _style_figure(fig, theme_mode, height=settings.explorer_chart_height)
+
+
+def top_fastest_trucks_chart(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Top Fastest Trucks", theme_mode)
+    palette = get_palette(theme_mode)
+    scoped = snapshot.nlargest(10, "speed").sort_values("speed")
+    fig = px.bar(
+        scoped,
+        x="speed",
+        y="truck_label",
+        orientation="h",
+        text="speed",
+        color="speed",
+        color_continuous_scale=[palette["accent"], palette["accent_alt"], palette["danger"]],
+        title="Top Fastest Trucks",
+    )
+    fig.update_traces(texttemplate="%{text:.1f} km/h", textposition="outside")
+    return _style_figure(fig, theme_mode)
+
+
+def fuel_level_distribution_chart(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Fuel Distribution", theme_mode)
+    palette = get_palette(theme_mode)
+    scoped = snapshot.copy()
+    scoped["fuel_band"] = pd.cut(
+        scoped["fuel_level"],
+        bins=[-1, settings.critical_fuel_pct, settings.low_fuel_pct, 60, 100],
+        labels=["Critical", "Low", "Operational", "Healthy"],
+    ).astype(str)
+    fig = px.histogram(
+        scoped,
+        x="fuel_level",
+        color="fuel_band",
+        nbins=16,
+        title="Fuel Level Distribution",
+        color_discrete_map={
+            "Critical": palette["danger"],
+            "Low": palette["warning"],
+            "Operational": palette["accent_alt"],
+            "Healthy": palette["accent"],
+        },
+    )
+    return _style_figure(fig, theme_mode)
+
+
+def fuel_consumption_ranking_chart(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Fuel Consumption Ranking", theme_mode)
+    scoped = snapshot.nlargest(10, "fuel_consumption_rate").sort_values("fuel_consumption_rate")
+    fig = px.bar(
+        scoped,
+        x="fuel_consumption_rate",
+        y="truck_label",
+        orientation="h",
+        text="fuel_consumption_rate",
+        color="high_consumption_live",
+        color_discrete_map={True: "#f59e0b", False: "#38bdf8"},
+        title="Fuel Consumption Ranking",
+    )
+    fig.update_traces(texttemplate="%{text:.1f} L/100km", textposition="outside")
+    return _style_figure(fig, theme_mode)
+
+
+def fuel_efficiency_bubble_chart(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Fuel Efficiency Analytics", theme_mode)
+    fig = px.scatter(
+        snapshot,
+        x="speed",
+        y="fuel_consumption_rate",
+        size="fuel_used",
+        color="fuel_efficiency_score",
+        hover_name="truck_label",
+        hover_data={"driver_id": True, "fuel_level": ":.1f", "engine_temp": ":.1f"},
+        color_continuous_scale="Tealgrn",
+        title="Fuel Efficiency Analytics",
+    )
+    return _style_figure(fig, theme_mode)
+
+
+def refueling_donut_chart(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Refueling Overview", theme_mode)
+    palette = get_palette(theme_mode)
+    scoped = snapshot.copy()
+    scoped["fuel_state"] = "Nominal"
+    scoped.loc[scoped["fuel_level"] <= settings.low_fuel_pct, "fuel_state"] = "Low Fuel"
+    scoped.loc[scoped["refueling"], "fuel_state"] = "Refueling"
+    scoped = scoped.groupby("fuel_state", as_index=False).size().rename(columns={"size": "count"})
+    fig = px.pie(
+        scoped,
+        names="fuel_state",
+        values="count",
+        hole=0.64,
+        title="Refueling and Low Fuel Status",
+        color="fuel_state",
+        color_discrete_map={
+            "Nominal": palette["accent"],
+            "Low Fuel": palette["warning"],
+            "Refueling": palette["accent_alt"],
+        },
+    )
+    return _style_figure(fig, theme_mode)
+
+
+def engine_temperature_chart(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Engine Thermal Analytics", theme_mode)
+    palette = get_palette(theme_mode)
+    fig = px.scatter(
+        snapshot,
+        x="speed",
+        y="engine_temp",
+        size="fuel_level",
+        color="severity",
+        hover_name="truck_label",
+        hover_data={"route_label": True, "fuel_consumption_rate": ":.1f"},
+        title="Engine Thermal Analytics",
+        color_discrete_map={
+            "Normal": palette["accent"],
+            "Medium": palette["warning"],
+            "High": palette["accent_alt"],
+            "Critical": palette["danger"],
+        },
+    )
+    fig.add_hline(y=settings.high_temp_c, line_dash="dot", line_color=palette["warning"])
+    fig.add_hline(y=settings.critical_temp_c, line_dash="dash", line_color=palette["danger"])
+    return _style_figure(fig, theme_mode)
+
+
+def engine_health_gauge(snapshot: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if snapshot.empty:
+        return _empty_figure("Engine Health Score", theme_mode)
+    palette = get_palette(theme_mode)
+    score = (
+        100
+        - max(float(snapshot["engine_temp"].mean()) - 72, 0) * 1.2
+        - int((snapshot["engine_temp"] >= settings.high_temp_c).sum()) * 4
+    )
+    score = max(0.0, min(100.0, score))
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number",
-            value=value,
-            number={"suffix": suffix},
-            title={"text": title},
+            value=score,
+            title={"text": "Engine Health Score"},
             gauge={
-                "axis": {"range": [None, max_value]},
+                "axis": {"range": [0, 100]},
                 "bar": {"color": palette["accent_alt"]},
                 "steps": [
-                    {"range": [0, threshold], "color": palette["card_alt"]},
-                    {"range": [threshold, max_value], "color": "rgba(245, 158, 11, 0.35)"},
+                    {"range": [0, 55], "color": "rgba(244, 63, 94, 0.18)"},
+                    {"range": [55, 80], "color": "rgba(245, 158, 11, 0.18)"},
+                    {"range": [80, 100], "color": "rgba(45, 212, 191, 0.18)"},
                 ],
-                "threshold": {"line": {"color": palette["danger"], "width": 4}, "value": threshold},
+                "threshold": {"line": {"color": palette["danger"], "width": 4}, "value": 55},
             },
         )
     )
-    return finalize_figure(fig, theme_mode, height=310)
+    return _style_figure(fig, theme_mode, height=300)
 
 
-def create_status_donut(frame: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
-
-    palette = get_palette(theme_mode)
-    color_map = {
-        "Moving": palette["accent"],
-        "Idle": palette["muted"],
-        "Maintenance": palette["warning"],
-        "Refueling": palette["accent_alt"],
-        "Delayed": palette["danger"],
-    }
-    fig = px.pie(
-        frame,
-        names="status",
-        values="truck_count",
-        hole=0.62,
-        color="status",
-        color_discrete_map=color_map,
-        title=title,
-    )
-    return finalize_figure(fig, theme_mode)
-
-
-def create_alert_bar(frame: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
-
+def alert_distribution_chart(alerts: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if alerts.empty:
+        return _empty_figure("Alert Distribution", theme_mode)
+    scoped = alerts.groupby(["title", "severity"], as_index=False).size().rename(columns={"size": "count"})
     palette = get_palette(theme_mode)
     fig = px.bar(
-        frame.sort_values("count"),
+        scoped.sort_values("count"),
         x="count",
-        y="alert_type",
+        y="title",
+        color="severity",
         orientation="h",
-        title=title,
-        color_discrete_sequence=[palette["warning"]],
-        text="count",
+        title="Alert Distribution",
+        color_discrete_map={
+            "Critical": palette["danger"],
+            "High": palette["warning"],
+            "Medium": palette["accent_alt"],
+            "Normal": palette["accent"],
+        },
     )
-    fig.update_traces(textposition="outside")
-    return finalize_figure(fig, theme_mode)
+    return _style_figure(fig, theme_mode)
 
 
-def create_speed_temperature_scatter(frame: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
+def alert_timeline_chart(alerts: pd.DataFrame, anomalies: pd.DataFrame, theme_mode: str) -> go.Figure:
+    frames: list[pd.DataFrame] = []
+    if not alerts.empty:
+        alert_frame = alerts.copy()
+        alert_frame["timestamp"] = pd.to_datetime(alert_frame["timestamp"], errors="coerce").dt.floor("min")
+        frames.append(alert_frame[["timestamp", "severity"]])
+    if not anomalies.empty:
+        anomaly_frame = anomalies.copy()
+        anomaly_frame["timestamp"] = pd.to_datetime(anomaly_frame["occurred_at"], errors="coerce").dt.floor("min")
+        frames.append(anomaly_frame.rename(columns={"severity": "severity"})[["timestamp", "severity"]])
+    if not frames:
+        return _empty_figure("Alert Timeline", theme_mode)
 
-    scoped = frame.copy()
-    scoped["bubble_size"] = scoped["risk_score"].clip(lower=10)
-    fig = px.scatter(
+    timeline = pd.concat(frames, ignore_index=True)
+    timeline = timeline.groupby(["timestamp", "severity"], as_index=False).size().rename(columns={"size": "count"})
+    palette = get_palette(theme_mode)
+    fig = px.area(
+        timeline,
+        x="timestamp",
+        y="count",
+        color="severity",
+        title="Alert and Anomaly Timeline",
+        color_discrete_map={
+            "Critical": palette["danger"],
+            "High": palette["warning"],
+            "Medium": palette["accent_alt"],
+            "Normal": palette["accent"],
+        },
+    )
+    return _style_figure(fig, theme_mode, height=settings.explorer_chart_height)
+
+
+def anomaly_category_chart(anomalies: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if anomalies.empty:
+        return _empty_figure("Anomaly Categories", theme_mode)
+    scoped = anomalies.groupby("category", as_index=False).size().rename(columns={"size": "count"})
+    fig = px.treemap(
         scoped,
-        x="speed",
-        y="engine_temp",
-        size="bubble_size",
-        color="alert_type",
-        hover_name="truck_label",
-        hover_data={"start_city": True, "end_city": True, "fuel_level": ":.1f"},
-        title=title,
+        path=["category"],
+        values="count",
+        color="count",
+        color_continuous_scale="Sunsetdark",
+        title="AI Anomaly Category Mix",
     )
-    return finalize_figure(fig, theme_mode)
+    return _style_figure(fig, theme_mode)
 
 
-def create_city_activity_bar(frame: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
+def problem_truck_score_chart(problem_trucks: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if problem_trucks.empty:
+        return _empty_figure("Problematic Trucks", theme_mode)
+    scoped = problem_trucks.nlargest(10, "anomaly_score").sort_values("anomaly_score")
+    fig = px.bar(
+        scoped,
+        x="anomaly_score",
+        y="truck_label",
+        orientation="h",
+        color="severity",
+        text="anomaly_score",
+        title="Most Problematic Trucks",
+    )
+    fig.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+    return _style_figure(fig, theme_mode)
 
+
+def maintenance_type_chart(maintenance_view: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if maintenance_view.empty:
+        return _empty_figure("Maintenance Types", theme_mode)
+    scoped = maintenance_view.copy()
+    scoped["maintenance_label"] = scoped["maintenance_type"].replace("", "Observation")
+    scoped = scoped.groupby("maintenance_label", as_index=False).size().rename(columns={"size": "count"})
+    fig = px.pie(
+        scoped,
+        names="maintenance_label",
+        values="count",
+        hole=0.62,
+        title="Maintenance Type Distribution",
+    )
+    return _style_figure(fig, theme_mode)
+
+
+def predicted_failure_chart(maintenance_view: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if maintenance_view.empty:
+        return _empty_figure("Predicted Failures", theme_mode)
+    scoped = (
+        maintenance_view.groupby("predicted_failure_band", as_index=False)
+        .size()
+        .rename(columns={"size": "truck_count"})
+    )
     palette = get_palette(theme_mode)
     fig = px.bar(
-        frame.sort_values("truck_count"),
-        x="truck_count",
-        y="city",
-        orientation="h",
-        title=title,
-        color_discrete_sequence=[palette["accent_alt"]],
-        text="truck_count",
-    )
-    fig.update_traces(textposition="outside")
-    return finalize_figure(fig, theme_mode)
-
-
-def create_location_map(frame: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    scoped = frame.dropna(subset=["latitude", "longitude"]).copy()
-    if scoped.empty:
-        return _empty_figure(title, theme_mode, "No geospatial coordinates are available.")
-
-    settings = get_settings()
-    scoped["map_size"] = scoped["risk_score"].clip(lower=10)
-    fig = px.scatter_mapbox(
         scoped,
-        lat="latitude",
-        lon="longitude",
-        color="status",
-        size="map_size",
-        hover_name="truck_label",
-        hover_data={"speed": ":.1f", "fuel_level": ":.1f", "engine_temp": ":.1f", "status": True},
-        zoom=4.2,
-        title=title,
-        height=settings.default_map_height,
+        x="predicted_failure_band",
+        y="truck_count",
+        color="predicted_failure_band",
+        title="Predicted Failure Bands",
+        color_discrete_map={
+            "Stable": palette["accent"],
+            "Watch": palette["warning"],
+            "Critical": palette["danger"],
+        },
     )
-    fig.update_layout(
-        mapbox_style=settings.map_style_dark if theme_mode == "dark" else settings.map_style_light,
-        margin={"l": 10, "r": 10, "t": 60, "b": 10},
-    )
-    return finalize_figure(fig, theme_mode, height=settings.default_map_height)
+    return _style_figure(fig, theme_mode)
 
 
-def create_trend_combo(frame: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
-
-    palette = get_palette(theme_mode)
+def maintenance_timeline_chart(maintenance_timeline: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if maintenance_timeline.empty:
+        return _empty_figure("Maintenance Timeline", theme_mode)
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_trace(
-        go.Bar(
-            x=frame["stat_date"],
-            y=frame["total_distance_km"],
-            name="Distance (km)",
-            marker_color=palette["accent_alt"],
-            opacity=0.65,
+        go.Scatter(
+            x=maintenance_timeline["timestamp"],
+            y=maintenance_timeline["maintenance_trucks"],
+            mode="lines+markers",
+            name="Maintenance Trucks",
+            line={"width": 3},
         ),
         secondary_y=False,
     )
     fig.add_trace(
         go.Scatter(
-            x=frame["stat_date"],
-            y=frame["fuel_per_100km"],
-            name="Fuel / 100km",
+            x=maintenance_timeline["timestamp"],
+            y=maintenance_timeline["average_engine_temp"],
             mode="lines+markers",
-            line={"color": palette["warning"], "width": 3},
+            name="Avg Engine Temp",
+            line={"width": 2, "dash": "dot"},
+        ),
+        secondary_y=True,
+    )
+    fig.update_layout(title="Maintenance Load and Thermal Pressure Timeline")
+    fig.update_yaxes(title_text="Maintenance Trucks", secondary_y=False)
+    fig.update_yaxes(title_text="Avg Engine Temp (C)", secondary_y=True)
+    return _style_figure(fig, theme_mode, height=settings.explorer_chart_height)
+
+
+def streaming_volume_chart(metric_history: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if metric_history.empty:
+        return _empty_figure("Streaming Throughput", theme_mode)
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig.add_trace(
+        go.Bar(
+            x=metric_history["buffer_captured_at"],
+            y=metric_history["streaming_events"],
+            name="Streaming Events",
+            opacity=0.58,
+        ),
+        secondary_y=False,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=metric_history["buffer_captured_at"],
+            y=metric_history["active_alerts"],
+            name="Active Alerts",
+            mode="lines+markers",
         ),
         secondary_y=True,
     )
     fig.add_trace(
         go.Scatter(
-            x=frame["stat_date"],
-            y=frame["total_alerts"],
-            name="Alerts",
-            mode="lines+markers",
-            line={"color": palette["danger"], "width": 2, "dash": "dot"},
+            x=metric_history["buffer_captured_at"],
+            y=metric_history["average_speed"],
+            name="Average Speed",
+            mode="lines",
         ),
         secondary_y=True,
     )
-    fig.update_layout(title=title)
-    fig.update_yaxes(title_text="Distance (km)", secondary_y=False)
-    fig.update_yaxes(title_text="Efficiency / Alerts", secondary_y=True)
-    return finalize_figure(fig, theme_mode, height=390)
+    fig.update_layout(title="Streaming Throughput and Alert Pressure")
+    fig.update_yaxes(title_text="Events per refresh", secondary_y=False)
+    fig.update_yaxes(title_text="Alerts / Speed", secondary_y=True)
+    return _style_figure(fig, theme_mode, height=settings.explorer_chart_height)
 
 
-def create_efficiency_scatter(frame: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
-
-    fig = px.scatter(
-        frame,
-        x="average_speed_kmh",
-        y="fuel_per_100km",
-        size="total_distance_km",
-        color="mean_risk_score",
-        hover_name="truck_label",
-        hover_data={"alerts_per_100km": ":.2f", "total_alerts": True},
-        color_continuous_scale="YlOrRd",
-        title=title,
+def engine_temperature_timeline_chart(truck_timeline: pd.DataFrame, theme_mode: str) -> go.Figure:
+    if truck_timeline.empty:
+        return _empty_figure("Engine Temperature Trend", theme_mode)
+    scoped = truck_timeline.copy()
+    scoped["buffer_captured_at"] = pd.to_datetime(scoped["buffer_captured_at"], errors="coerce")
+    order = (
+        scoped.sort_values("buffer_captured_at")
+        .groupby("truck_id")
+        .tail(1)
+        .sort_values("engine_temp", ascending=False)["truck_id"]
+        .head(6)
+        .tolist()
     )
-    return finalize_figure(fig, theme_mode)
-
-
-def create_top_risk_bar(frame: pd.DataFrame, theme_mode: str, title: str, top_n: int = 10) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
-
-    scoped = frame.nlargest(top_n, "mean_risk_score").sort_values("mean_risk_score")
-    fig = px.bar(
+    scoped = scoped[scoped["truck_id"].isin(order)] if order else scoped
+    fig = px.line(
         scoped,
-        x="mean_risk_score",
-        y="truck_label",
-        orientation="h",
-        color="fuel_per_100km",
-        color_continuous_scale="Sunsetdark",
-        title=title,
-        text="mean_risk_score",
+        x="buffer_captured_at",
+        y="engine_temp",
+        color="truck_label",
+        markers=True,
+        title="Engine Temperature Trend",
     )
-    fig.update_traces(texttemplate="%{text:.1f}", textposition="outside")
-    return finalize_figure(fig, theme_mode)
-
-
-def create_risk_heatmap(matrix: pd.DataFrame, theme_mode: str, title: str) -> go.Figure:
-    if matrix.empty:
-        return _empty_figure(title, theme_mode)
-
-    fig = go.Figure(
-        data=go.Heatmap(
-            z=matrix.values,
-            x=[str(value) for value in matrix.columns],
-            y=matrix.index.tolist(),
-            colorscale="YlOrRd",
-            colorbar={"title": "Risk"},
-        )
-    )
-    fig.update_layout(title=title)
-    return finalize_figure(fig, theme_mode, height=420)
-
-
-def create_maintenance_driver_chart(frame: pd.DataFrame, theme_mode: str, title: str, top_n: int = 10) -> go.Figure:
-    if frame.empty:
-        return _empty_figure(title, theme_mode)
-
-    scoped = frame.nlargest(top_n, "maintenance_proxy_score").sort_values("maintenance_proxy_score")
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=scoped["truck_label"], y=scoped["overheat_count"], name="Overheat", marker_color="#f97316"))
-    fig.add_trace(go.Bar(x=scoped["truck_label"], y=scoped["low_fuel_count"], name="Low Fuel", marker_color="#eab308"))
-    fig.add_trace(go.Bar(x=scoped["truck_label"], y=scoped["hours_stopped"], name="Stopped Hours", marker_color="#38bdf8"))
-    fig.update_layout(title=title, barmode="stack")
-    return finalize_figure(fig, theme_mode)
+    fig.add_hline(y=settings.high_temp_c, line_dash="dot")
+    return _style_figure(fig, theme_mode, height=settings.explorer_chart_height)

@@ -1,11 +1,20 @@
-"""Export helpers for the analytics platform."""
+"""Reusable CSV export helpers."""
 
 from __future__ import annotations
 
+from datetime import datetime
+from io import StringIO
+
 import pandas as pd
 
-from utils.formatters import dataframe_to_csv_bytes, make_export_filename
+
+def dataframe_to_csv_bytes(frame: pd.DataFrame) -> bytes:
+    if frame.empty:
+        return b""
+    buffer = StringIO()
+    frame.to_csv(buffer, index=False)
+    return buffer.getvalue().encode("utf-8")
 
 
-def build_csv_export(frame: pd.DataFrame, prefix: str, suffix: str | None = None) -> tuple[bytes, str]:
-    return dataframe_to_csv_bytes(frame), make_export_filename(prefix, suffix)
+def make_export_filename(prefix: str) -> str:
+    return f"{prefix}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"

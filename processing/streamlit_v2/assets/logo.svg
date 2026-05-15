@@ -1,0 +1,15 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fleetGradient" x1="10" y1="10" x2="56" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="18" fill="#08111C"/>
+  <rect x="5" y="5" width="54" height="54" rx="17" stroke="url(#fleetGradient)" stroke-opacity="0.45" stroke-width="2"/>
+  <path d="M18 37.5L24 23.5C24.7 21.8 26.3 20.7 28.1 20.7H41.5C43.3 20.7 44.9 21.8 45.6 23.5L50 34.3C50.4 35.2 50.6 36.2 50.6 37.2V41.2C50.6 42.5 49.6 43.5 48.3 43.5H46.4C45.8 46.1 43.5 48 40.8 48C38.1 48 35.8 46.1 35.2 43.5H28.8C28.2 46.1 25.9 48 23.2 48C20.5 48 18.2 46.1 17.6 43.5H15.7C14.4 43.5 13.4 42.5 13.4 41.2V39.3C13.4 38.6 13.6 38 14 37.5L18 37.5Z" fill="url(#fleetGradient)" fill-opacity="0.18" stroke="url(#fleetGradient)" stroke-width="2"/>
+  <path d="M22 31H42" stroke="url(#fleetGradient)" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M25.5 26H38.5" stroke="url(#fleetGradient)" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="23.3" cy="42.3" r="3.5" fill="#2DD4BF"/>
+  <circle cx="40.7" cy="42.3" r="3.5" fill="#3B82F6"/>
+</svg>

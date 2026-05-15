@@ -1,4 +1,4 @@
-"""Application logging helpers."""
+"""Structured logging for the Streamlit analytics platform."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from config.settings import get_settings
 
 
 @lru_cache(maxsize=1)
-def configure_logging() -> None:
+def _configure_logging() -> None:
     settings = get_settings()
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -18,5 +18,5 @@ def configure_logging() -> None:
 
 
 def get_logger(name: str) -> logging.Logger:
-    configure_logging()
+    _configure_logging()
     return logging.getLogger(name)

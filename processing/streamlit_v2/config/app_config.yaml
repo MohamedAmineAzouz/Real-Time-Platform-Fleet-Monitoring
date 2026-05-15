@@ -1,26 +1,33 @@
 app:
   title: Fleet Command Center
-  icon: FC
-  default_theme: dark
-  default_page_size: 25
+  subtitle: Speed Layer Streaming Command Center
+  theme: dark
+  page_icon: ":truck:"
 
-realtime:
-  cache_ttl_seconds: 15
-  refresh_interval_seconds: 10
-  default_lookback_minutes: 30
-  stale_after_minutes: 5
+refresh:
+  interval_seconds: 5
+  cache_ttl_seconds: 5
+  buffer_snapshots: 72
+  stale_after_seconds: 25
 
-batch:
-  cache_ttl_seconds: 300
-  default_range_days: 7
-  max_range_days: 31
-  latest_search_days: 30
-
-charts:
-  default_height: 360
-  map_height: 460
+map:
+  latitude: 33.88
+  longitude: -6.85
+  zoom: 4.8
+  pitch: 38
 
 thresholds:
-  low_fuel_pct: 20
-  high_temp_c: 100
   overspeed_kmh: 120
+  critical_speed_kmh: 145
+  low_fuel_pct: 20
+  critical_fuel_pct: 10
+  high_temp_c: 100
+  critical_temp_c: 112
+  suspicious_fuel_drop_pct: 6
+  gps_jump_speed_kmh: 155
+  no_movement_distance_km: 0.05
+
+charts:
+  default_height: 330
+  map_height: 520
+  explorer_height: 360

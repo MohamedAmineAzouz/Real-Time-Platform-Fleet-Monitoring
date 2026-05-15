@@ -1,9 +1,8 @@
-"""Cached Cassandra session lifecycle for Streamlit."""
+"""Reusable Cassandra session service for Streamlit."""
 
 from __future__ import annotations
 
 import time
-from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -15,11 +14,11 @@ from utils.logging_utils import get_logger
 
 
 logger = get_logger(__name__)
+settings = get_settings()
 
 
-@st.cache_resource(show_spinner="Connecting to Cassandra cluster...")
+@st.cache_resource(show_spinner="Connecting to Cassandra speed layer...")
 def get_session() -> Session:
-    settings = get_settings()
     auth_provider = (
         PlainTextAuthProvider(settings.cassandra_user, settings.cassandra_pass)
         if settings.cassandra_user
@@ -27,7 +26,7 @@ def get_session() -> Session:
     )
 
     last_error: Exception | None = None
-    for attempt in range(1, settings.cassandra_connect_retries + 1):
+    for attempt in range(1, settings.cassandra_retries + 1):
         try:
             cluster = Cluster(
                 [settings.cassandra_host],
@@ -45,14 +44,18 @@ def get_session() -> Session:
             return session
         except Exception as exc:
             last_error = exc
-            logger.warning("Cassandra not ready (%s/%s): %s", attempt, settings.cassandra_connect_retries, exc)
-            time.sleep(settings.cassandra_connect_delay_seconds)
+            logger.warning(
+                "Cassandra connection attempt %s/%s failed: %s",
+                attempt,
+                settings.cassandra_retries,
+                exc,
+            )
+            time.sleep(settings.cassandra_delay_seconds)
 
-    raise RuntimeError(f"Unable to connect to Cassandra: {last_error}")
+    raise RuntimeError(f"Unable to connect to Cassandra after retries: {last_error}")
 
 
-def query_dataframe(cql: str, parameters: list[Any] | tuple[Any, ...] | None = None) -> pd.DataFrame:
-    session = get_session()
-    rows = session.execute(cql, parameters or [])
+def query_dataframe(cql: str, parameters: list[object] | tuple[object, ...] | None = None) -> pd.DataFrame:
+    rows = get_session().execute(cql, parameters or [])
     records = [row._asdict() for row in rows]
     return pd.DataFrame(records)
