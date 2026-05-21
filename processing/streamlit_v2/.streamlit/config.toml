@@ -1,11 +1,14 @@
 [theme]
-base = "dark"
-primaryColor = "#38bdf8"
-backgroundColor = "#0b1220"
-secondaryBackgroundColor = "#111b2e"
-textColor = "#edf2f7"
-font = "sans serif"
+primaryColor="#00d2ff"
+backgroundColor="#0b0e14"
+secondaryBackgroundColor="#171c28"
+textColor="#e0e6ed"
+font="sans serif"
 
 [server]
 headless = true
-runOnSave = true
+enableCORS = false
+enableXsrfProtection = false
+
+[browser]
+gatherUsageStats = false
