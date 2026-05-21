@@ -1,0 +1,1 @@
+ALTER TABLE batch_daily_truck_stats ADD driver_id text;

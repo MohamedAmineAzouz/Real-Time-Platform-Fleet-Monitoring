@@ -39,7 +39,7 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_daily_truck_stats.py"
         "owner": "fleet-data-eng",
         "retries": 1,
         "retry_delay": timedelta(minutes=5),
-        "execution_timeout": timedelta(hours=1),
+        "execution_timeout": timedelta(hours=4),
     },
     schedule="0 2 * * *",
     start_date=datetime(2026, 5, 1),
@@ -91,10 +91,10 @@ def daily_truck_stats_dag():
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
             
             # Resource Allocation
-            "spark.driver.memory": "1g",
-            "spark.executor.memory": "1g",
+            "spark.driver.memory": "2g",
+            "spark.executor.memory": "2g",
             "spark.executor.cores": "1",
-            "spark.sql.shuffle.partitions": "10",
+            "spark.sql.shuffle.partitions": "100",
             
             # Environment Variables for the Job
             "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,

@@ -36,7 +36,8 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
     """
     
     # Window to calculate time deltas between events
-    w_truck = Window.partitionBy("truck_id").orderBy("event_time")
+    # Including driver_id in partition to handle driver swaps on same truck
+    w_truck = Window.partitionBy("truck_id", "driver_id").orderBy("event_time")
     
     # Calculate duration between events in seconds
     with_time_deltas = (
@@ -52,10 +53,10 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
         .withColumn("duration_sec", when(col("duration_sec") > 600, lit(600)).otherwise(col("duration_sec")))
     )
     
-    # ── Step 1: Sum Deltas per Truck ──────────────────────────────────────
+    # ── Step 1: Sum Deltas per Truck & Driver ─────────────────────────────
     per_truck_deltas = (
         with_time_deltas
-        .groupBy("truck_id")
+        .groupBy("truck_id", "driver_id")
         .agg(
             _round(_sum("fuel_consumed_l"), 2).alias("total_fuel_consumed_l"),
             _round(_sum("distance_km"), 2).alias("total_distance_km"),
