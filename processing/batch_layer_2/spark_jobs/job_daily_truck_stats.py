@@ -119,10 +119,6 @@ def run_job(spark: SparkSession, date_from: str, date_to: str):
         print(f"⚠️ Error reading Parquet from {S3_PATH}: {e}")
         return
 
-    if telemetry_df.count() == 0:
-        print(f"⚠️ No telemetry data found for period {date_from} to {date_to}")
-        return
-        
     # Load Truck Registry from Cassandra
     trucks_df = spark.read \
         .format("org.apache.spark.sql.cassandra") \
@@ -134,7 +130,8 @@ def run_job(spark: SparkSession, date_from: str, date_to: str):
     stats_df = compute_daily_stats(telemetry_df, trucks_df, date_from)
     
     # ── 3. Save ───────────────────────────────────────────────────────────
-    print(f"💾 Writing {stats_df.count()} records to Cassandra: batch_daily_truck_stats")
+    # REMOVED stats_df.count() to prevent double execution of the aggregation pipeline
+    print(f"💾 Committing records to Cassandra: {CASSANDRA_KEYSPACE}.batch_daily_truck_stats")
     
     stats_df.write \
         .format("org.apache.spark.sql.cassandra") \

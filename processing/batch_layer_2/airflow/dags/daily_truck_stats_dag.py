@@ -93,8 +93,8 @@ def daily_truck_stats_dag():
             # Resource Allocation
             "spark.driver.memory": "2g",
             "spark.executor.memory": "2g",
-            "spark.executor.cores": "1",
-            "spark.sql.shuffle.partitions": "100",
+            # "spark.executor.cores": "2",
+            "spark.sql.shuffle.partitions": "200",
             
             # Environment Variables for the Job
             "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
