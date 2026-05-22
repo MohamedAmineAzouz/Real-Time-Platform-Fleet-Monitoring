@@ -327,6 +327,47 @@ if not batch_df.empty:
         st.plotly_chart(fig_util_detail, use_container_width=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
+    # PERFORMANCE ROW 3: Max Speed & Alerts
+    p_row3_col1, p_row3_col2 = st.columns(2)
+    
+    with p_row3_col1:
+        # 5. Max Speed Analytics
+        st.markdown(f"""
+            <div class="glass-card">
+                <div class="card-header">
+                    <h3 style="color: {current_theme['text_main']};">🏁 Max Speed by Truck</h3>
+                </div>
+                <div class="card-body">
+        """, unsafe_allow_html=True)
+        fig_max_speed = px.bar(global_subset_df.sort_values('max_speed_kmh', ascending=True), 
+                               y='display_label', x='max_speed_kmh',
+                               orientation='h',
+                               title=f"Max Speed Thresholds (Fleet Subset)",
+                               color='max_speed_kmh', color_continuous_scale="Reds",
+                               labels={'display_label': 'Vehicle & Driver', 'max_speed_kmh': 'Max Speed (km/h)'})
+        fig_max_speed.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=350, margin=dict(t=50, b=0, l=0, r=0), yaxis={'type': 'category'})
+        st.plotly_chart(fig_max_speed, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+    with p_row3_col2:
+        # 6. Total Alerts by Truck
+        st.markdown(f"""
+            <div class="glass-card">
+                <div class="card-header">
+                    <h3 style="color: {current_theme['text_main']};">🚨 Total Alerts by Truck</h3>
+                </div>
+                <div class="card-body">
+        """, unsafe_allow_html=True)
+        fig_alerts_truck = px.bar(global_subset_df.sort_values('total_alerts', ascending=True), 
+                                  y='display_label', x='total_alerts',
+                                  orientation='h',
+                                  title=f"Safety Incidents (Fleet Subset)",
+                                  color='total_alerts', color_continuous_scale="Oranges",
+                                  labels={'display_label': 'Vehicle & Driver', 'total_alerts': 'Total Alerts'})
+        fig_alerts_truck.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=350, margin=dict(t=50, b=0, l=0, r=0), yaxis={'type': 'category'})
+        st.plotly_chart(fig_alerts_truck, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
     # ── FUEL ANALYTICS CENTER ─────────────────────────────────────────────────
     st.markdown(f"""
         <div class="glass-card">

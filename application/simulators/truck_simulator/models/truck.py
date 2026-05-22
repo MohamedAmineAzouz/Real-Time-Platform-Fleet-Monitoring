@@ -16,7 +16,7 @@ REFUEL_TARGET = 95.0
 FUEL_STOP_THRESHOLD = 20.0
 
 # Anomaly injection config
-ANOMALY_START_CHANCE = 0.003
+ANOMALY_START_CHANCE = 0.0001
 ANOMALY_STOP_CHANCE = 0.18
 ANOMALY_TYPES = ["overspeed", "overheat", "fuel_leak"]
 
