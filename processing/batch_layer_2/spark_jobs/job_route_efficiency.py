@@ -19,13 +19,13 @@ LAKE_BUCKET = os.getenv("LAKE_BUCKET", "fleet-data")
 LAKE_PREFIX = os.getenv("LAKE_PREFIX", "silver/truck_history")
 S3_PATH = f"s3a://{LAKE_BUCKET}/{LAKE_PREFIX}"
 
-def compute_route_efficiency(telemetry_df: DataFrame, run_date: str) -> DataFrame:
+def compute_route_efficiency(telemetry_df: DataFrame, trajets_df: DataFrame, run_date: str) -> DataFrame:
     """
-    Groups telemetry by Start City, End City, Truck, and Driver to analyze granular route performance.
+    Groups telemetry by Route, Truck, and Driver.
+    Compares total_distance_km with trajets_df to determine finish status.
     """
     
-    # ── Step 1: Calculate Time Deltas (similar to stats job) ────────────────
-    # We now partition by truck, driver AND the specific route
+    # ── Step 1: Calculate Time Deltas ─────────────────────────────────────
     w_trip = Window.partitionBy("truck_id", "driver_id", "start_city", "end_city").orderBy("event_time")
     
     with_time = (
@@ -45,8 +45,6 @@ def compute_route_efficiency(telemetry_df: DataFrame, run_date: str) -> DataFram
         with_time
         .groupBy("start_city", "end_city", "truck_id", "driver_id")
         .agg(
-            # Since we group by truck/driver/route, total_trips is usually 1 for a single day record
-            # but we can count unique sessions if needed. For now, lit(1) is the standard daily contribution.
             lit(1).alias("total_trips"), 
             _round(_sum("distance_km"), 2).alias("total_distance_km"),
             _round(_sum("fuel_consumed_l"), 2).alias("total_fuel_consumed_l"),
@@ -56,9 +54,25 @@ def compute_route_efficiency(telemetry_df: DataFrame, run_date: str) -> DataFram
         )
     )
     
-    # ── Step 3: Derived Efficiency Metrics ────────────────────────────────
+    # ── Step 3: Join with Trajets for Target Distance ─────────────────────
+    # Standardize trajets: one record per city pair
+    std_trajets = trajets_df.groupBy("start_city", "end_city").agg(_avg("distance_km").alias("target_distance_km"))
+    
+    with_targets = route_stats.join(std_trajets, ["start_city", "end_city"], "left")
+    
+    # ── Step 4: Determine Finish Status ───────────────────────────────────
+    # We consider a route 'finished' if actual distance is >= 95% of target
+    # target_distance_km is used only for calculation and not saved to Cassandra
     final_df = (
-        route_stats
+        with_targets
+        .withColumn(
+            "status",
+            when(
+                (col("target_distance_km").isNotNull()) & 
+                (col("total_distance_km") >= (col("target_distance_km") * 0.95)),
+                lit("finished")
+            ).otherwise(lit("unfinished"))
+        )
         .withColumn(
             "avg_fuel_per_100km",
             _round(
@@ -76,7 +90,7 @@ def compute_route_efficiency(telemetry_df: DataFrame, run_date: str) -> DataFram
             )
         )
         .withColumn("stat_date", lit(run_date))
-        .drop("total_alerts") 
+        .drop("total_alerts", "target_distance_km") # DROPPED target_distance_km
     )
     
     return final_df
@@ -94,11 +108,22 @@ def run_job(spark: SparkSession, date_from: str, date_to: str):
         print(f"⚠️ Error reading Telemetry: {e}")
         return
 
+    # Load Trajets from Cassandra
+    try:
+        trajets_df = spark.read \
+            .format("org.apache.spark.sql.cassandra") \
+            .options(table="trajets", keyspace=CASSANDRA_KEYSPACE) \
+            .load()
+    except Exception as e:
+        print(f"⚠️ Error reading Trajets: {e}")
+        # Create empty fallback to avoid crash
+        trajets_df = spark.createDataFrame([], "start_city STRING, end_city STRING, distance_km DOUBLE")
+
     # Process
-    route_df = compute_route_efficiency(telemetry_df, date_from)
+    route_df = compute_route_efficiency(telemetry_df, trajets_df, date_from)
     
     # Save to Cassandra
-    print(f"💾 Saving route efficiency stats to: {CASSANDRA_KEYSPACE}.batch_route_efficiency")
+    print(f"💾 Committing route intelligence to: {CASSANDRA_KEYSPACE}.batch_route_efficiency")
     
     route_df.write \
         .format("org.apache.spark.sql.cassandra") \
@@ -106,7 +131,7 @@ def run_job(spark: SparkSession, date_from: str, date_to: str):
         .options(table="batch_route_efficiency", keyspace=CASSANDRA_KEYSPACE) \
         .save()
         
-    print("✅ Route Efficiency Job Completed")
+    print("✅ Route Efficiency Job Completed Successfully")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

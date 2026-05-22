@@ -51,7 +51,7 @@ def maintenance_prediction_dag():
     def get_analysis_dates(**context):
         logical_date = context.get("logical_date") or context.get("execution_date")
         # Process the full day that just ended
-        target_date = logical_date
+        target_date = logical_date - timedelta(days=1)
         return {
             "date_from": target_date.strftime("%Y-%m-%d"),
             "date_to": target_date.strftime("%Y-%m-%d"),
