@@ -28,17 +28,17 @@ S3_PATH = f"s3a://{LAKE_BUCKET}/{LAKE_PREFIX}"
 def compute_maintenance_flags(telemetry_df: DataFrame, run_date: str) -> DataFrame:
     """
     Core analytics for predictive maintenance.
-    Groups telemetry by truck to identify wear and tear patterns.
+    Groups telemetry by truck and driver to identify health patterns.
     """
     
     # ── Step 1: Aggregate Health Metrics ──────────────────────────────────
     health_metrics = (
         telemetry_df
-        .groupBy("truck_id")
+        .groupBy("truck_id", "driver_id")
         .agg(
             _avg("engine_temp").alias("avg_engine_temp"),
             _max("engine_temp").alias("max_engine_temp"),
-            _max("odometer_km").alias("max_odometer_km"), # FIXED: Corrected column name from telemetry schema
+            _max("odometer_km").alias("max_odometer_km"),
             _avg("fuel_level").alias("avg_fuel_rate"), 
             _stddev("fuel_level").alias("fuel_rate_stddev"),
             count(when(col("alert_type") == "OVERHEAT", 1)).alias("overheat_count"),
