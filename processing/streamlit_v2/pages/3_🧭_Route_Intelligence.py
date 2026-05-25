@@ -180,6 +180,7 @@ if not raw_df.empty:
     total_active_routes = len(route_agg)
     total_km = route_agg['total_distance_km'].sum()
     total_l = route_agg['total_fuel_consumed_l'].sum()
+    avg_duration = route_agg['total_duration_h'].sum() / completed_trips if completed_trips > 0 else 0
     
     # ── Header ──────────────────────────────────────────────────────────────────
     col_h1, col_h2 = st.columns([3, 1])
@@ -202,6 +203,7 @@ if not raw_df.empty:
         {"label": "Active Routes", "value": f"{total_active_routes}", "icon": "🚚"},
         {"label": "Fleet Distance", "value": f"{total_km:,.0f} km", "icon": "🛣️"},
         {"label": "Fuel Usage", "value": f"{total_l:,.0f} L", "icon": "⛽"},
+        {"label": "Avg Duration", "value": f"{avg_duration:.1f} h", "icon": "⏱️"},
     ]
     render_route_kpis(kpis)
 
@@ -245,48 +247,75 @@ if not raw_df.empty:
         st.plotly_chart(fig_use, use_container_width=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
-    # ROW 2: Risk Analytics
-    st.markdown(f"""
-        <div class="glass-card">
-            <div class="card-header"><h3>🚨 Route Risk Intelligence</h3></div>
-            <div class="card-body">
-    """, unsafe_allow_html=True)
-    
-    fig_risk = px.scatter(route_agg, x='avg_speed_kmh', y='avg_alerts_per_trip', 
-                         size='total_trips', color='avg_alerts_per_trip',
-                         color_continuous_scale="Reds",
-                         title="Risk Analysis: Speed vs Incident Rate per Route",
-                         labels={'avg_speed_kmh': 'Avg Speed (km/h)', 'avg_alerts_per_trip': 'Alerts per Trip'})
-    fig_risk.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=450, margin=dict(t=30, b=0, l=0, r=0))
-    st.plotly_chart(fig_risk, use_container_width=True)
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    # ROW 2: Distance and Risk
+    r2_col1, r2_col2 = st.columns(2)
 
-    # ── Executive Reporting Row ───────────────────────────────────────────────
-    st.markdown(f"""
-        <div class="glass-card">
-            <div class="card-header"><h3>📊 Executive Logistics Reporting</h3></div>
-            <div class="card-body">
-    """, unsafe_allow_html=True)
-    
-    rep_col1, rep_col2, rep_col3 = st.columns(3)
-    with rep_col1:
-        st.markdown("#### 📥 Data Export")
-        csv = filtered_df.to_csv(index=False).encode('utf-8')
-        st.download_button("Export Detailed Route Ledger (CSV)", data=csv, file_name="route_intelligence_report.csv", mime="text/csv", use_container_width=True)
-    
-    with rep_col2:
-        st.markdown("#### 💡 AI Recommendations")
-        if not route_agg.empty:
-            expensive = route_agg.loc[route_agg['avg_fuel_per_100km'].idxmax()]
-            st.warning(f"Optimization Required: Route **{expensive['route_name']}** has high fuel consumption. Consider vehicle swaps or speed capping.")
-        else:
-            st.info("Insufficient data for AI recommendations.")
+    with r2_col1:
+        # 3. Longest Routes
+        st.markdown(f"""
+            <div class="glass-card">
+                <div class="card-header"><h3>📏 Longest Fleet Routes</h3></div>
+                <div class="card-body">
+        """, unsafe_allow_html=True)
+        fig_long = px.bar(route_agg.sort_values('total_distance_km', ascending=False).head(10), 
+                         x='total_distance_km', y='route_name', orientation='h',
+                         color='total_distance_km', color_continuous_scale="Purples",
+                         title="Top 10 Corridors by Total Distance",
+                         labels={'total_distance_km': 'Total KM', 'route_name': 'Route Corridor'})
+        fig_long.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=400, margin=dict(t=30, b=0, l=0, r=0), yaxis={'type': 'category'})
+        st.plotly_chart(fig_long, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
-    with rep_col3:
-        st.markdown("#### 📅 Operations Summary")
-        st.success(f"Logistics operations processed **{completed_trips}** completed trips across **{total_active_routes}** active corridors.")
-    
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    with r2_col2:
+        # 4. Alerts by Route
+        st.markdown(f"""
+            <div class="glass-card">
+                <div class="card-header"><h3>🚨 Route Risk Analysis</h3></div>
+                <div class="card-body">
+        """, unsafe_allow_html=True)
+        fig_alerts = px.bar(route_agg.sort_values('avg_alerts_per_trip', ascending=False).head(10), 
+                           x='avg_alerts_per_trip', y='route_name', orientation='h',
+                           color='avg_alerts_per_trip', color_continuous_scale="Reds",
+                           title="Top 10 Corridors by Alert Frequency",
+                           labels={'avg_alerts_per_trip': 'Avg Alerts/Trip', 'route_name': 'Route Corridor'})
+        fig_alerts.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=400, margin=dict(t=30, b=0, l=0, r=0), yaxis={'type': 'category'})
+        st.plotly_chart(fig_alerts, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+    # ROW 3: Duration and Speed
+    r3_col1, r3_col2 = st.columns(2)
+
+    with r3_col1:
+        # 5. Average Duration
+        st.markdown(f"""
+            <div class="glass-card">
+                <div class="card-header"><h3>⏱️ Average Route Duration</h3></div>
+                <div class="card-body">
+        """, unsafe_allow_html=True)
+        fig_dur = px.bar(route_agg.sort_values('total_duration_h', ascending=False).head(10), 
+                        x='total_duration_h', y='route_name', orientation='h',
+                        color='total_duration_h', color_continuous_scale="Teal",
+                        title="Top 10 Longest Duration Corridors",
+                        labels={'total_duration_h': 'Avg Hours', 'route_name': 'Route Corridor'})
+        fig_dur.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=400, margin=dict(t=30, b=0, l=0, r=0), yaxis={'type': 'category'})
+        st.plotly_chart(fig_dur, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+    with r3_col2:
+        # 6. Average Speed
+        st.markdown(f"""
+            <div class="glass-card">
+                <div class="card-header"><h3>🚀 Average Route Speed</h3></div>
+                <div class="card-body">
+        """, unsafe_allow_html=True)
+        fig_spd = px.bar(route_agg.sort_values('avg_speed_kmh', ascending=False).head(10), 
+                        x='avg_speed_kmh', y='route_name', orientation='h',
+                        color='avg_speed_kmh', color_continuous_scale="Turbo",
+                        title="Top 10 Fastest Route Corridors",
+                        labels={'avg_speed_kmh': 'Avg km/h', 'route_name': 'Route Corridor'})
+        fig_spd.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=400, margin=dict(t=30, b=0, l=0, r=0), yaxis={'type': 'category'})
+        st.plotly_chart(fig_spd, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
 else:
     st.warning("⚠️ No logistics optimization data found. Please ensure 'route_efficiency_dag' has populated the data warehouse.")

@@ -425,9 +425,10 @@ if not batch_df.empty:
     st.markdown("</div></div>", unsafe_allow_html=True)
 
     # ── Secondary Grid (Risk & Alerts) ────────────────────────────────────────
-    col_left, col_right = st.columns([2, 1])
+    # Using a 3-column layout [2, 1, 1] to put everything on the same line
+    col_inc, col_mix, col_risk = st.columns([2, 1, 1])
 
-    with col_left:
+    with col_inc:
         st.markdown(f"""
             <div class="glass-card">
                 <div class="card-header">
@@ -442,39 +443,15 @@ if not batch_df.empty:
                                             var_name='Alert Type', value_name='Count')
         
         fig_inc_all = px.bar(incident_dist, x='Count', y='display_label', color='Alert Type',
-                            title="Total Incident Breakdown (Fleet Subset)",
+                            title="Incident Breakdown",
                             barmode='group',
                             color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_inc_all.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=450, margin=dict(t=50, b=0, l=0, r=0), yaxis={'type': 'category'})
+        fig_inc_all.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color, height=450, margin=dict(t=50, b=0, l=0, r=0), yaxis={'type': 'category'}, showlegend=False)
         st.plotly_chart(fig_inc_all, use_container_width=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
-    with col_right:
-        # Risk Ranking
-        st.markdown(f"""
-            <div class="glass-card">
-                <div class="card-header">
-                    <h4 style="color: {current_theme['text_main']};">🚩 High-Risk Profiles</h4>
-                </div>
-                <div class="card-body">
-        """, unsafe_allow_html=True)
-        risk_df = filtered_df.sort_values('total_alerts', ascending=False).head(5)
-        for _, row in risk_df.iterrows():
-            st.markdown(f"""
-                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid {current_theme['border']};">
-                    <div>
-                        <div style="font-weight: 600;">Truck #{row['truck_id']}</div>
-                        <div style="font-size: 0.75rem; color: {current_theme['text_muted']};">{row['driver_name']}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <span style="color: {current_theme['danger']}; font-weight: 700;">{row['total_alerts']} Alerts</span>
-                        <div style="font-size: 0.7rem; color: {current_theme['text_muted']};">{row['overspeed_count']} Overspeeds</div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-        st.markdown("</div></div>", unsafe_allow_html=True)
-
-        # Incident Trends (Distribution for the day)
+    with col_mix:
+        # Alert Mix (Moved here to be in the middle)
         st.markdown(f"""
             <div class="glass-card">
                 <div class="card-header">
@@ -490,8 +467,32 @@ if not batch_df.empty:
             hole=0.6,
             color_discrete_sequence=px.colors.sequential.Tealgrn_r
         )
-        fig_pie.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), height=250, paper_bgcolor="rgba(0,0,0,0)")
+        fig_pie.update_layout(showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5), margin=dict(t=0, b=0, l=0, r=0), height=400, paper_bgcolor="rgba(0,0,0,0)", font_color=chart_font_color)
         st.plotly_chart(fig_pie, use_container_width=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+    with col_risk:
+        # Risk Ranking
+        st.markdown(f"""
+            <div class="glass-card">
+                <div class="card-header">
+                    <h4 style="color: {current_theme['text_main']};">🚩 Risk Profiles</h4>
+                </div>
+                <div class="card-body">
+        """, unsafe_allow_html=True)
+        risk_df = filtered_df.sort_values('total_alerts', ascending=False).head(5)
+        for _, row in risk_df.iterrows():
+            st.markdown(f"""
+                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid {current_theme['border']};">
+                    <div>
+                        <div style="font-weight: 600;">Truck #{row['truck_id']}</div>
+                        <div style="font-size: 0.75rem; color: {current_theme['text_muted']};">{row['driver_name']}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="color: {current_theme['danger']}; font-weight: 700;">{row['total_alerts']}🚨</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
 else:
