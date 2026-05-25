@@ -74,6 +74,7 @@ def run_violations_job(spark, start_date, end_date):
     speeding_events = df_driving.filter(col("speed") > SPEED_LIMIT) \
         .select(
             "truck_id",
+            "driver_id", # ADDED driver_id
             col("event_time").alias("violation_date"),
             coalesce(col("start_city"), col("end_city"), lit("Unknown")).alias("city"),
             col("speed")
@@ -82,27 +83,29 @@ def run_violations_job(spark, start_date, end_date):
     # ── 3. Extract Real Driving Days & Cities ─────────────────────────────
     driving_contexts = df_driving.select(
         "truck_id",
+        "driver_id", # ADDED driver_id
         date_trunc("day", col("event_time")).alias("violation_date"),
         coalesce(col("start_city"), col("end_city"), lit("Unknown")).alias("city"),
         col("speed")
-    ).dropDuplicates(["truck_id", "violation_date", "city"])
+    ).dropDuplicates(["truck_id", "driver_id", "violation_date", "city"])
 
-    # ── 4. Group by Truck ─────────────────────────────────────────────────
-    speeding_by_truck = speeding_events.groupBy("truck_id").agg(
+    # ── 4. Group by Truck & Driver ────────────────────────────────────────
+    speeding_by_truck = speeding_events.groupBy("truck_id", "driver_id").agg(
         collect_list(struct("violation_date", "city", "speed")).alias("speeding_recs")
     )
 
-    driving_by_truck = driving_contexts.groupBy("truck_id").agg(
+    driving_by_truck = driving_contexts.groupBy("truck_id", "driver_id").agg(
         collect_list(struct("violation_date", "city", "speed")).alias("driving_recs")
     )
 
-    metrics = speeding_by_truck.join(driving_by_truck, "truck_id", "outer").collect()
-    print(f"📊 Analyzed {len(metrics)} trucks with actual telemetry")
+    metrics = speeding_by_truck.join(driving_by_truck, ["truck_id", "driver_id"], "outer").collect()
+    print(f"📊 Analyzed {len(metrics)} truck/driver profiles with actual telemetry")
 
     violations_data = []
 
     for row in metrics:
         truck_id = row.truck_id
+        driver_id = row.driver_id # ADDED driver_id
         speed_recs = row.speeding_recs or []
         drive_recs = row.driving_recs or []
 
@@ -189,6 +192,7 @@ def run_violations_job(spark, start_date, end_date):
             violations_data.append({
                 "month_year": start_date[:7],
                 "truck_id": truck_id,
+                "driver_id": driver_id, # ADDED driver_id
                 "violation_id": str(uuid.uuid4()),
                 "violation_type": v["type"],
                 "city": v["city"],
@@ -202,7 +206,19 @@ def run_violations_job(spark, start_date, end_date):
         print("✅ No realistic violations generated (normal for professional fleets)")
         return
 
-    schema = StructType([StructField('month_year', StringType(), False), StructField('truck_id', IntegerType(), False), StructField('violation_id', StringType(), False), StructField('violation_type', StringType(), False), StructField('city', StringType(), True), StructField('fine_mad', DoubleType(), False), StructField('violation_date', TimestampType(), False), StructField('details', StringType(), True)]); df_out = spark.createDataFrame(violations_data, schema); df_out = df_out.withColumn('violation_date', df_out['violation_date'].cast('date'))
+    schema = StructType([
+        StructField('month_year', StringType(), False), 
+        StructField('truck_id', IntegerType(), False), 
+        StructField('driver_id', StringType(), False), # ADDED driver_id
+        StructField('violation_id', StringType(), False), 
+        StructField('violation_type', StringType(), False), 
+        StructField('city', StringType(), True), 
+        StructField('fine_mad', DoubleType(), False), 
+        StructField('violation_date', TimestampType(), False), 
+        StructField('details', StringType(), True)
+    ])
+    df_out = spark.createDataFrame(violations_data, schema)
+    df_out = df_out.withColumn('violation_date', df_out['violation_date'].cast('date'))
     print(f"💾 Writing {len(violations_data)} violation records to Cassandra...")
 
     df_out.write \
