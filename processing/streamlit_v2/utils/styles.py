@@ -237,9 +237,47 @@ def get_css(mode="Dark"):
         color: {theme['text_main']};
         transition: background 0.2s;
     }}
-    
+
     .alert-item:hover {{
         background: {theme['text_muted']}15;
+    }}
+
+    /* Ranking Row Styling */
+    .ranking-row {{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid {theme['border']};
+    }}
+
+    .ranking-row:last-child {{
+        border-bottom: none;
+    }}
+
+    .rank-index {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: white;
+        flex-shrink: 0;
+    }}
+
+    .rank-subject {{
+        flex-grow: 1;
+        font-weight: 500;
+        font-size: 0.85rem;
+    }}
+
+    .rank-value {{
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: {theme['primary']};
     }}
 
     /* Streamlit Overrides */
