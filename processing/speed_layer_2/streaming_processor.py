@@ -8,14 +8,20 @@ from storage_backend import (
    ensure_bucket_exists
 )
 
+import os
 
 def create_spark_session():
-
+    # Fetch remote host from environment variable
+    remote_host = os.getenv("REMOTE_HOST", "spark-master")
+    
     builder = (
         SparkSession.builder
         .appName("FleetSpeedLayer")
+        .master(f"spark://{remote_host}:7077")
         .config("spark.cassandra.connection.host", CASSANDRA_HOST)
         .config("spark.cassandra.connection.port", CASSANDRA_PORT)
+        .config("spark.jars.ivy", "/home/spark/.ivy2")
+        .config("spark.cores.max", "6")
     )
 
     builder = configure_storage(

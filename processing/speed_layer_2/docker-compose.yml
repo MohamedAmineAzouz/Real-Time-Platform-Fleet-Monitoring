@@ -3,7 +3,6 @@
 
 services:
   spark-master:
-    # image: apache/spark:3.5.1
     build: .
     container_name: spark-master
     user: root
@@ -13,6 +12,85 @@ services:
       - "4040:4040"   # Spark App UI
     environment:
       - SPARK_MODE=master
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.master.Master
+    volumes:
+      - spark-data:/opt/spark/work-dir
+      - .:/opt/spark/work-dir
+    networks:
+      - iot_network
+
+  spark-worker-1:
+    build: .
+    container_name: spark-worker-1
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_CORES=3
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+    volumes:
+      - spark-data:/opt/spark/work-dir
+    networks:
+      - iot_network
+
+  spark-worker-2:
+    build: .
+    container_name: spark-worker-2
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_CORES=3
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+    volumes:
+      - spark-data:/opt/spark/work-dir
+    networks:
+      - iot_network
+
+      
+  spark-worker-3:
+    build: .
+    container_name: spark-worker-3
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_CORES=3
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+    volumes:
+      - spark-data:/opt/spark/work-dir
+    networks:
+      - iot_network
+
+
+  streaming-processor:
+    build: .
+    container_name: streaming-processor
+    user: root
+    depends_on:
+      - spark-master
+      - spark-worker-1
+      - spark-worker-2
+      - spark-worker-3
+    environment:
+      - REMOTE_HOST=spark-master
       - CASSANDRA_HOST=${CASSANDRA_HOST:-cassandra}
       - CASSANDRA_PORT=${CASSANDRA_PORT:-9042}
       - CASSANDRA_KEYSPACE=${CASSANDRA_KEYSPACE:-fleet_1}
@@ -28,126 +106,17 @@ services:
       bash -c "
       mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars &&
       pip install minio &&
-      /opt/spark/bin/spark-class
-      org.apache.spark.deploy.master.Master &
-
-      sleep 15 &&
+      
+      echo 'Waiting for cluster...' &&
+      sleep 30 &&
 
       /opt/spark/bin/spark-submit
-      --master spark://spark-master:7077
       --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,com.datastax.spark:spark-cassandra-connector_2.12:3.4.1,org.apache.hadoop:hadoop-aws:3.3.4,com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.15
-      --conf spark.cassandra.connection.host=${CASSANDRA_HOST:-cassandra}
-      --conf spark.cassandra.connection.port=${CASSANDRA_PORT:-9042}
-      --conf spark.jars.ivy=/home/spark/.ivy2
-      --total-executor-cores 6
       /opt/spark/work-dir/streaming_processor.py
-
-      wait
       "
     volumes:
-      - spark-data:/opt/spark/work-dir
       - .:/opt/spark/work-dir
       - ivy-cache:/home/spark/.ivy2
-
-    networks:
-      - iot_network
-
-
-  spark-worker-1:
-    # image: apache/spark:3.5.1
-    build: .
-    container_name: spark-worker-1
-    depends_on:
-      - spark-master
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=4g
-      - SPARK_WORKER_CORES=3
-      - CASSANDRA_HOST=${CASSANDRA_HOST:-cassandra}
-      - CASSANDRA_PORT=${CASSANDRA_PORT:-9042}
-      - CASSANDRA_KEYSPACE=${CASSANDRA_KEYSPACE:-fleet_1}
-      - KAFKA_BROKER=${KAFKA_BROKER:-kafka:9092}
-      - KAFKA_TOPIC=${KAFKA_TOPIC:-truck-gps-staging-1}
-      - LAKE_BUCKET=${LAKE_BUCKET:-fleet-data}
-      - LAKE_PREFIX=${LAKE_PREFIX:-silver/truck_history}
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-minio}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://minio:9000}
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
-
-    command: >
-      /opt/spark/bin/spark-class
-      org.apache.spark.deploy.worker.Worker
-      spark://spark-master:7077
-    volumes:
-      - spark-data:/opt/spark/work-dir
-    networks:
-      - iot_network
-
-
-  spark-worker-2:
-    # image: apache/spark:3.5.1
-    build: .
-    container_name: spark-worker-2
-    depends_on:
-      - spark-master
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=4g
-      - SPARK_WORKER_CORES=3
-      - CASSANDRA_HOST=${CASSANDRA_HOST:-cassandra}
-      - CASSANDRA_PORT=${CASSANDRA_PORT:-9042}
-      - CASSANDRA_KEYSPACE=${CASSANDRA_KEYSPACE:-fleet_1}
-      - KAFKA_BROKER=${KAFKA_BROKER:-kafka:9092}
-      - KAFKA_TOPIC=${KAFKA_TOPIC:-truck-gps-staging-1}
-      - LAKE_BUCKET=${LAKE_BUCKET:-fleet-data}
-      - LAKE_PREFIX=${LAKE_PREFIX:-silver/truck_history}
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-minio}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://minio:9000}
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
-
-    command: >
-      /opt/spark/bin/spark-class
-      org.apache.spark.deploy.worker.Worker
-      spark://spark-master:7077
-    volumes:
-      - spark-data:/opt/spark/work-dir
-    networks:
-      - iot_network
-
-
-  spark-worker-3:
-    # image: apache/spark:3.5.1
-    build: .
-    container_name: spark-worker-3
-    depends_on:
-      - spark-master
-    environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=4g
-      - SPARK_WORKER_CORES=3
-      - CASSANDRA_HOST=${CASSANDRA_HOST:-cassandra}
-      - CASSANDRA_PORT=${CASSANDRA_PORT:-9042}
-      - CASSANDRA_KEYSPACE=${CASSANDRA_KEYSPACE:-fleet_1}
-      - KAFKA_BROKER=${KAFKA_BROKER:-kafka:9092}
-      - KAFKA_TOPIC=${KAFKA_TOPIC:-truck-gps-staging-1}
-      - LAKE_BUCKET=${LAKE_BUCKET:-fleet-data}
-      - LAKE_PREFIX=${LAKE_PREFIX:-silver/truck_history}
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-minio}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://minio:9000}
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
-
-    command: >
-      /opt/spark/bin/spark-class
-      org.apache.spark.deploy.worker.Worker
-      spark://spark-master:7077
-    volumes:
-      - spark-data:/opt/spark/work-dir
     networks:
       - iot_network
 
