@@ -3,7 +3,10 @@
   <!-- Top Navigation Bar -->
   <header class="topbar">
     <div class="logo">
-      <span class="logo-icon">🚛</span>
+      <button class="mobile-toggle" (click)="isSidebarOpen = !isSidebarOpen">
+        <i class="bi" [ngClass]="isSidebarOpen ? 'bi-x-lg' : 'bi-list'"></i>
+      </button>
+      <i class="bi bi-truck logo-icon"></i>
       <div class="logo-text">
         <span class="logo-title">FLEETPULSE</span>
         <span class="logo-sub">Live Tracking System</span>
@@ -48,9 +51,9 @@
   <div class="main-layout">
 
     <!-- Sidebar: Truck List -->
-    <aside class="sidebar">
+    <aside class="sidebar" [class.mobile-open]="isSidebarOpen">
       <div class="sidebar-header">
-        <span>FLEET</span>
+        <span>FLEET MONITORING</span>
         <span class="count-badge">{{ trucks.length }}</span>
       </div>
 
@@ -65,34 +68,34 @@
           *ngFor="let truck of trucks"
           [class.selected]="selectedTruck?.truck_id === truck.truck_id"
           [class.anomaly-card]="truck.is_alert"
-          (click)="selectTruck(truck)"
+          (click)="selectTruck(truck); isSidebarOpen = false"
         >
           <div class="card-top">
             <div class="truck-id">
-              <span class="truck-icon">🚛</span>
+              <i class="bi bi-truck truck-icon"></i>
               <span>T-{{ truck.truck_id | number:'2.0-0' }}</span>
             </div>
             <div *ngIf="truck.in_maintenance" class="anomaly-badge" style="background: #00b4ff">
-              🔧 MAINTENANCE
+              <i class="bi bi-wrench-adjustable"></i>&nbsp;MAINTENANCE
             </div>
             <div *ngIf="!truck.in_maintenance" class="anomaly-badge" [style.background]="getAlertColor(truck.alert_type)">
-              {{ getAlertIcon(truck.alert_type) }}&nbsp;{{ getAlertLabel(truck.alert_type) }}
+              <i class="bi" [ngClass]="getAlertIcon(truck.alert_type)"></i>&nbsp;{{ getAlertLabel(truck.alert_type) }}
             </div>
           </div>
 
           <div class="card-metrics">
             <div class="metric">
-              <span class="metric-icon">⚡</span>
+              <i class="bi bi-speedometer2 metric-icon"></i>
               <strong>{{ truck.speed | number:'1.0-0' }}</strong>
               <span class="metric-unit">km/h</span>
             </div>
             <div class="metric">
-              <span class="metric-icon">⛽</span>
+              <i class="bi bi-fuel-pump-fill metric-icon"></i>
               <strong>{{ truck.fuel_level | number:'1.0-0' }}</strong>
               <span class="metric-unit">%</span>
             </div>
             <div class="metric">
-              <span class="metric-icon">🌡</span>
+              <i class="bi bi-thermometer-half metric-icon"></i>
               <strong>{{ truck.engine_temp | number:'1.0-0' }}</strong>
               <span class="metric-unit">°C</span>
             </div>
@@ -113,19 +116,25 @@
       <div id="map"></div>
 
       <!-- Detail Panel -->
-      <div class="detail-panel" *ngIf="selectedTruck"
-           [style.border-color]="getAlertColor(selectedTruck.alert_type)">
+      <div class="detail-panel floating-panel" *ngIf="selectedTruck"
+           [class.dragging]="isDragging"
+           (mousedown)="startDragging($event)"
+           [style.border-color]="getAlertColor(selectedTruck.alert_type)"
+           [style.left.px]="panelLeft"
+           [style.top.px]="panelTop">
         <button class="close-btn" (click)="closeSidebar()">✕</button>
 
         <div class="detail-header">
-          <div class="detail-icon" [style.color]="getAlertColor(selectedTruck.alert_type)">🚛</div>
+          <div class="detail-icon" [style.color]="getAlertColor(selectedTruck.alert_type)">
+            <i class="bi bi-truck"></i>
+          </div>
           <div>
-            <div class="detail-title">TRUCK #{{ selectedTruck.truck_id }}</div>
+            <div class="detail-title">#{{ selectedTruck.truck_id }} — {{ selectedTruck.truck_model }}</div>
             <div class="detail-anomaly" [style.color]="getAlertColor(selectedTruck.alert_type)">
-              {{ getAlertIcon(selectedTruck.alert_type) }} {{ selectedTruck.alert_type }}
+              <i class="bi" [ngClass]="getAlertIcon(selectedTruck.alert_type)"></i> {{ selectedTruck.alert_type }}
             </div>
             <div class="detail-timestamp">
-              <span class="ts-label">📡</span>
+              <i class="bi bi-broadcast ts-label"></i>
               <span class="ts-value">{{ formatServerTime(selectedTruck.event_time) }}</span>
               <span class="ts-age" [class.stale]="isStale(selectedTruck.event_time)">
                 {{ getDataAge(selectedTruck.event_time) }}
@@ -146,73 +155,43 @@
 
         <div class="detail-grid">
           <div class="detail-item">
-            <span class="di-label">SPEED</span>
+            <span class="di-label"><i class="bi bi-speedometer2"></i> SPEED</span>
             <span class="di-val">{{ selectedTruck.speed | number:'1.1-1' }} <small>km/h</small></span>
           </div>
           <div class="detail-item">
-            <span class="di-label">FUEL</span>
+            <span class="di-label"><i class="bi bi-fuel-pump-fill"></i> FUEL</span>
             <span class="di-val">{{ selectedTruck.fuel_level | number:'1.1-1' }} <small>%</small></span>
           </div>
           <div class="detail-item">
-            <span class="di-label">ENGINE TEMP</span>
+            <span class="di-label"><i class="bi bi-thermometer-half"></i> ENGINE TEMP</span>
             <span class="di-val" [style.color]="selectedTruck.engine_temp > 100 ? '#ff4d4d' : 'inherit'">
               {{ selectedTruck.engine_temp | number:'1.1-1' }} <small>°C</small>
             </span>
           </div>
           <div class="detail-item">
-            <span class="di-label">ODOMETER</span>
+            <span class="di-label"><i class="bi bi-hash"></i> ODOMETER</span>
             <span class="di-val">{{ selectedTruck.odometer_km | number:'1.0-0' }} <small>km</small></span>
           </div>
-          <div class="detail-item">
-            <span class="di-label">ROUTE</span>
+          <div class="detail-item full">
+            <span class="di-label"><i class="bi bi-geo-alt-fill"></i> ROUTE</span>
             <span class="di-val small">{{ selectedTruck.start_city }} → {{ selectedTruck.end_city }}</span>
           </div>
-          <!-- <div class="detail-item">
-            <span class="di-label">DISTANCE</span>
-            <span class="di-val">{{ selectedTruck.distance_km | number:'1.2-2' }} <small>km</small></span>
-          </div> -->
-          <!-- <div class="detail-item">
-            <span class="di-label">FUEL RATE</span>
-            <span class="di-val" [style.color]="selectedTruck.high_consumption ? '#ff9500' : 'inherit'">
-              {{ selectedTruck.fuel_consumption_rate | number:'1.3-3' }} <small>%/km</small>
-            </span>
-          </div> -->
-          <!-- <div class="detail-item">
-            <span class="di-label">TRIP FUEL USED</span>
-            <span class="di-val">{{ selectedTruck.fuel_consumed_trip | number:'1.1-1' }} <small>%</small></span>
-          </div> -->
-          <!-- <div class="detail-item" *ngIf="selectedTruck.refueling">
-            <span class="di-label">REFUELED</span>
-            <span class="di-val" style="color: var(--ok)">+{{ selectedTruck.fuel_refueled | number:'1.1-1' }} <small>%</small></span>
-          </div> -->
-          <div class="detail-item">
-            <span class="di-label">LATITUDE</span>
-            <span class="di-val">{{ selectedTruck.latitude | number:'1.4-4' }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="di-label">LONGITUDE</span>
-            <span class="di-val">{{ selectedTruck.longitude | number:'1.4-4' }}</span>
-          </div>
           <div class="detail-item full">
-            <span class="di-label">DRIVER</span>
-            <span class="di-val small">{{ selectedTruck.driver_id }}</span>
-          </div>
-          <div class="detail-item full">
-            <span class="di-label">LAST EVENT (UTC)</span>
-            <span class="di-val small">{{ selectedTruck.event_time }}</span>
+            <span class="di-label"><i class="bi bi-person-badge-fill"></i> DRIVER</span>
+            <span class="di-val small">{{ selectedTruck.driver_name }}</span>
           </div>
           <div class="detail-item full" *ngIf="selectedTruck.theft">
-            <span class="di-label">🚨 FUEL THEFT DETECTED</span>
+            <span class="di-label text-danger"><i class="bi bi-exclamation-triangle-fill"></i> FUEL THEFT DETECTED</span>
             <span class="di-val" style="color:#ff4d4d">
               AMOUNT: {{ selectedTruck.theft_amount | number:'1.1-1' }}%
             </span>
           </div>
           <div class="detail-item full" *ngIf="selectedTruck.refueling">
-            <span class="di-label">⛽ REFUELING</span>
+            <span class="di-label text-success"><i class="bi bi-fuel-pump"></i> REFUELING</span>
             <span class="di-val small">AT {{ selectedTruck.refuel_city }}</span>
           </div>
           <div class="detail-item full" *ngIf="selectedTruck.in_maintenance">
-            <span class="di-label">🔧 MAINTENANCE</span>
+            <span class="di-label" style="color: #00b4ff"><i class="bi bi-wrench-adjustable"></i> MAINTENANCE</span>
             <span class="di-val small" style="color: #00b4ff">
               {{ selectedTruck.maintenance_type }}
             </span>

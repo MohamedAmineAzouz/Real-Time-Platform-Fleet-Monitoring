@@ -24,6 +24,14 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedTruck: Truck | null = null;
   isLoading = true;
   lastUpdated: Date = new Date();
+  isSidebarOpen = false;
+  panelLeft = 0;
+  panelTop = 0;
+  dragOffsetX = 0;
+  dragOffsetY = 0;
+  isDragging = false;
+  private startMouseX = 0;
+  private startMouseY = 0;
 
   private intervalId: any;
   private map: any;
@@ -94,12 +102,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getAlertIcon(alertType: string): string {
     switch (alertType) {
-      case 'OVERHEAT':   return '🌡️';
-      case 'OVERSPEED':  return '⚡';
-      case 'FUEL_THEFT': return '🚨';
-      case 'FUEL_LEAK':  return '💧';
-      case 'LOW_FUEL':   return '⛽';
-      default:           return '✅';
+      case 'OVERHEAT':   return 'bi-thermometer-high';
+      case 'OVERSPEED':  return 'bi-speedometer2';
+      case 'FUEL_THEFT': return 'bi-exclamation-triangle-fill';
+      case 'FUEL_LEAK':  return 'bi-droplet-half';
+      case 'LOW_FUEL':   return 'bi-fuel-pump-fill';
+      default:           return 'bi-check-circle-fill';
     }
   }
 
@@ -128,10 +136,42 @@ export class AppComponent implements OnInit, OnDestroy {
 
   selectTruck(truck: Truck): void {
     this.selectedTruck = truck;
+    this.dragOffsetX = 0;
+    this.dragOffsetY = 0;
     if (this.map) {
       this.map.flyTo([truck.latitude, truck.longitude], 12, { duration: 1.2, easeLinearity: 0.25 });
       this.ensureRouteLines(truck);
     }
+    this.cdr.detectChanges();
+  }
+
+  // ── Dragging logic ─────────────────────────────────────────────────────────
+
+  startDragging(event: MouseEvent): void {
+    // Only drag if left clicking and NOT clicking the close button
+    if (event.button !== 0 || (event.target as HTMLElement).classList.contains('close-btn')) return;
+    
+    this.isDragging = true;
+    this.startMouseX = event.clientX;
+    this.startMouseY = event.clientY;
+    
+    const onMouseMove = (e: MouseEvent) => this.onDrag(e);
+    const onMouseUp = () => {
+      this.isDragging = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
+  private onDrag(event: MouseEvent): void {
+    if (!this.isDragging) return;
+    this.dragOffsetX += event.clientX - this.startMouseX;
+    this.dragOffsetY += event.clientY - this.startMouseY;
+    this.startMouseX = event.clientX;
+    this.startMouseY = event.clientY;
     this.cdr.detectChanges();
   }
 
@@ -174,7 +214,12 @@ export class AppComponent implements OnInit, OnDestroy {
   private startAnimationLoop(): void {
     const animate = () => {
       const now = performance.now();
-      this.truckStates.forEach(state => this.applyInterpolation(state, now));
+      this.truckStates.forEach((state, id) => {
+        this.applyInterpolation(state, now);
+        if (this.selectedTruck?.truck_id === id) {
+          this.updatePanelPosition(state);
+        }
+      });
       requestAnimationFrame(animate);
     };
     requestAnimationFrame(animate);
@@ -187,6 +232,15 @@ export class AppComponent implements OnInit, OnDestroy {
     const lat = state.currentLat + (state.targetLat - state.currentLat) * e;
     const lng = state.currentLng + (state.targetLng - state.currentLng) * e;
     state.marker.setLatLng([lat, lng]);
+  }
+
+  private updatePanelPosition(state: TruckState): void {
+    if (!this.map) return;
+    const latLng = state.marker.getLatLng();
+    const point = this.map.latLngToContainerPoint(latLng);
+    this.panelLeft = point.x + this.dragOffsetX;
+    this.panelTop = point.y + this.dragOffsetY;
+    this.cdr.detectChanges();
   }
 
   // ── Data loading ───────────────────────────────────────────────────────────
@@ -207,6 +261,10 @@ export class AppComponent implements OnInit, OnDestroy {
               updated.longitude !== this.selectedTruck.longitude;
             this.selectedTruck = updated;
             if (posChanged) this.updatePolylineSplit(updated);
+            
+            // Immediately update panel position if map is moving/zooming
+            const state = this.truckStates.get(updated.truck_id);
+            if (state) this.updatePanelPosition(state);
           } else {
             this.closeSidebar();
           }
@@ -230,12 +288,12 @@ export class AppComponent implements OnInit, OnDestroy {
       let markerHtml;
       if (truck.in_maintenance) {
         markerHtml = `<div class="truck-marker" style="background: #00b4ff; animation: none">
-                        <span>🔧</span>
+                        <i class="bi bi-wrench-adjustable" style="color: white"></i>
                       </div>`;
       } else {
         const color = this.getAlertColor(truck.alert_type);
         markerHtml = `<div class="truck-marker ${truck.is_alert ? 'pulse' : ''}" style="background:${color}">
-                        <span>🚛</span>
+                        <i class="bi bi-truck" style="color: white"></i>
                       </div>`;
       }
       const icon = L.divIcon({

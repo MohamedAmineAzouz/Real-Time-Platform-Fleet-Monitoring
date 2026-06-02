@@ -31,6 +31,12 @@ def prepare_all() -> None:
         "truck_latest_by_id":
             sess.prepare("SELECT * FROM truck_latest WHERE truck_id = ?"),
 
+        # registry enrichment
+        "drivers_all":
+            sess.prepare("SELECT driver_id, name FROM drivers"),
+        "trucks_registry_all":
+            sess.prepare("SELECT truck_id, model FROM trucks"),
+
         # truck_history
         "truck_history_by_id":
             sess.prepare(

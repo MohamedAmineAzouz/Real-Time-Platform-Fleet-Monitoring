@@ -41,6 +41,9 @@ class TruckLatest(BaseModel):
     high_consumption:       Optional[bool]     = None
     fuel_consumed_trip:     Optional[float]    = None
     fuel_refueled:          Optional[float]    = None
+    # Enrichment fields (from registry)
+    driver_name:            Optional[str]      = None
+    truck_model:            Optional[str]      = None
     # Maintenance fields
     in_maintenance:         Optional[bool]     = None
     maintenance_type:       Optional[str]      = None

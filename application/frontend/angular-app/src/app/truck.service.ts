@@ -28,6 +28,9 @@ export interface Truck {
   high_consumption:       boolean;
   fuel_consumed_trip:     number;
   fuel_refueled:          number;
+  // Enrichment fields
+  driver_name:            string | null;
+  truck_model:            string | null;
   // Maintenance fields (new)
   in_maintenance:         boolean;
   maintenance_type:       string | null;
