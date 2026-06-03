@@ -37,7 +37,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private map: any;
   private truckStates: Map<number, TruckState> = new Map();
 
-  // ── Route state ────────────────────────────────────────────────────────────
   private cachedRouteLatLngs: [number, number][] = [];
   private completedPolyline: any = null;
   private remainingPolyline: any = null;
@@ -65,8 +64,6 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.map) this.map.remove();
   }
 
-  // ── Time helpers ───────────────────────────────────────────────────────────
-
   formatServerTime(isoTimestamp: string): string {
     if (!isoTimestamp) return '--:--:--';
     return new Date(isoTimestamp).toLocaleTimeString('en-GB', {
@@ -87,8 +84,6 @@ export class AppComponent implements OnInit, OnDestroy {
     return Date.now() - new Date(isoTimestamp).getTime() > 60000;
   }
 
-  // ── Alert helpers — uses alert_type from Cassandra/API ────────────────────
-
   getAlertColor(alertType: string): string {
     switch (alertType) {
       case 'OVERHEAT':   return '#ff4d4d';
@@ -96,7 +91,7 @@ export class AppComponent implements OnInit, OnDestroy {
       case 'FUEL_THEFT': return '#ff4d4d';
       case 'FUEL_LEAK':  return '#ffdd00';
       case 'LOW_FUEL':   return '#ff9500';
-      default:           return '#00e676';   // NORMAL
+      default:           return '#00e676';
     }
   }
 
@@ -122,8 +117,6 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-
   get normalCount(): number { return this.trucks.filter(t => !t.is_alert && !t.in_maintenance).length; }
   get alertCount():  number { return this.trucks.filter(t => t.is_alert).length; }
   get maintenanceCount(): number { return this.trucks.filter(t => t.in_maintenance).length; }
@@ -131,8 +124,6 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!this.trucks.length) return 0;
     return Math.round(this.trucks.reduce((s, t) => s + t.speed, 0) / this.trucks.length);
   }
-
-  // ── Truck selection ────────────────────────────────────────────────────────
 
   selectTruck(truck: Truck): void {
     this.selectedTruck = truck;
@@ -145,23 +136,17 @@ export class AppComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  // ── Dragging logic ─────────────────────────────────────────────────────────
-
   startDragging(event: MouseEvent): void {
-    // Only drag if left clicking and NOT clicking the close button
     if (event.button !== 0 || (event.target as HTMLElement).classList.contains('close-btn')) return;
-    
     this.isDragging = true;
     this.startMouseX = event.clientX;
     this.startMouseY = event.clientY;
-    
     const onMouseMove = (e: MouseEvent) => this.onDrag(e);
     const onMouseUp = () => {
       this.isDragging = false;
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
-    
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
   }
@@ -183,8 +168,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.cachedRouteLatLngs = [];
     this.cachedRoute = null;
   }
-
-  // ── Leaflet bootstrap ──────────────────────────────────────────────────────
 
   private loadLeaflet(): Promise<void> {
     return new Promise((resolve) => {
@@ -208,8 +191,6 @@ export class AppComponent implements OnInit, OnDestroy {
     }).addTo(this.map);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
   }
-
-  // ── Animation loop ─────────────────────────────────────────────────────────
 
   private startAnimationLoop(): void {
     const animate = () => {
@@ -243,8 +224,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  // ── Data loading ───────────────────────────────────────────────────────────
-
   loadTrucks(): void {
     this.truckService.getTrucks().subscribe({
       next: (data) => {
@@ -252,7 +231,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.isLoading = false;
         this.lastUpdated = new Date();
         this.updateMarkers(data);
-
         if (this.selectedTruck) {
           const updated = data.find(t => t.truck_id === this.selectedTruck!.truck_id);
           if (updated) {
@@ -261,8 +239,6 @@ export class AppComponent implements OnInit, OnDestroy {
               updated.longitude !== this.selectedTruck.longitude;
             this.selectedTruck = updated;
             if (posChanged) this.updatePolylineSplit(updated);
-            
-            // Immediately update panel position if map is moving/zooming
             const state = this.truckStates.get(updated.truck_id);
             if (state) this.updatePanelPosition(state);
           } else {
@@ -283,7 +259,6 @@ export class AppComponent implements OnInit, OnDestroy {
     const L = (window as any).L;
     if (!this.map || !L) return;
     const now = performance.now();
-
     trucks.forEach(truck => {
       let markerHtml;
       if (truck.in_maintenance) {
@@ -327,7 +302,6 @@ export class AppComponent implements OnInit, OnDestroy {
         });
       }
     });
-
     const liveIds = new Set(trucks.map(t => t.truck_id));
     this.truckStates.forEach((state, id) => {
       if (!liveIds.has(id)) {
@@ -337,14 +311,11 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Route lines ────────────────────────────────────────────────────────────
-
   private ensureRouteLines(truck: Truck): void {
     const L = (window as any).L;
     if (!this.map || !L) return;
-
     const startCity = truck.start_city;
-    const endCity   = truck.end_city;
+    const endCity = truck.end_city;
     if (!startCity || !endCity) return;
 
     const isSameRoute =
@@ -355,68 +326,43 @@ export class AppComponent implements OnInit, OnDestroy {
       this.updatePolylineSplit(truck);
       return;
     }
-
     const startCoords = this.getCityCoords(startCity);
-    const endCoords   = this.getCityCoords(endCity);
+    const endCoords = this.getCityCoords(endCity);
     if (!startCoords || !endCoords) return;
-
     this.destroyPolylines();
     this.cachedRouteLatLngs = [];
     const myToken = ++this.routeDrawToken;
-
     const url = `${this.OSRM_URL}${startCoords[1]},${startCoords[0]};${endCoords[1]},${endCoords[0]}?overview=full&geometries=geojson`;
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        if (myToken !== this.routeDrawToken) return;
-        if (!data.routes?.[0]) return;
-
-        this.cachedRouteLatLngs = data.routes[0].geometry.coordinates.map(
-          (c: number[]) => [c[1], c[0]] as [number, number]
-        );
-        this.cachedRoute = { startCity, endCity };
-        this.activeRouteTruckId = truck.truck_id;
-
-        this.completedPolyline = L.polyline([], {
-          color: '#00e676', weight: 4, opacity: 0.9, lineCap: 'round', lineJoin: 'round'
-        }).addTo(this.map);
-
-        this.remainingPolyline = L.polyline([], {
-          color: '#00b4ff', weight: 4, opacity: 0.7,
-          dashArray: '10, 8', lineCap: 'round', lineJoin: 'round'
-        }).addTo(this.map);
-
-        this.updatePolylineSplit(truck);
-        const bounds = (window as any).L.latLngBounds(this.cachedRouteLatLngs);
-        this.map.fitBounds(bounds, { padding: [100, 100], maxZoom: 13 });
-      })
-      .catch(err => console.error('Route fetch error:', err));
+    fetch(url).then(res => res.json()).then(data => {
+      if (myToken !== this.routeDrawToken) return;
+      if (!data.routes?.[0]) return;
+      this.cachedRouteLatLngs = data.routes[0].geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
+      this.cachedRoute = { startCity, endCity };
+      this.activeRouteTruckId = truck.truck_id;
+      this.completedPolyline = L.polyline([], { color: '#00e676', weight: 4, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(this.map);
+      this.remainingPolyline = L.polyline([], { color: '#00b4ff', weight: 4, opacity: 0.7, dashArray: '10, 8', lineCap: 'round', lineJoin: 'round' }).addTo(this.map);
+      this.updatePolylineSplit(truck);
+      const bounds = (window as any).L.latLngBounds(this.cachedRouteLatLngs);
+      this.map.fitBounds(bounds, { padding: [100, 100], maxZoom: 13 });
+    }).catch(err => console.error('Route fetch error:', err));
   }
 
   private updatePolylineSplit(truck: Truck): void {
     if (!this.completedPolyline || !this.remainingPolyline) return;
     if (this.cachedRouteLatLngs.length === 0) return;
-
     const state = this.truckStates.get(truck.truck_id);
-    const now   = performance.now();
+    const now = performance.now();
     let truckPos: [number, number];
-
     if (state) {
       const t = Math.min((now - state.lastUpdateTime) / this.ANIMATION_DURATION, 1);
       const e = this.EASING(t);
-      truckPos = [
-        state.currentLat + (state.targetLat - state.currentLat) * e,
-        state.currentLng + (state.targetLng - state.currentLng) * e
-      ];
+      truckPos = [state.currentLat + (state.targetLat - state.currentLat) * e, state.currentLng + (state.targetLng - state.currentLng) * e];
     } else {
       truckPos = [truck.latitude, truck.longitude];
     }
-
-    const splitIndex    = this.findClosestPointIndex(truckPos, this.cachedRouteLatLngs);
+    const splitIndex = this.findClosestPointIndex(truckPos, this.cachedRouteLatLngs);
     const completedPath = [...this.cachedRouteLatLngs.slice(0, splitIndex + 1), truckPos];
     const remainingPath = [truckPos, ...this.cachedRouteLatLngs.slice(splitIndex + 1)];
-
     this.completedPolyline.setLatLngs(completedPath);
     this.remainingPolyline.setLatLngs(remainingPath);
   }
@@ -425,8 +371,6 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.completedPolyline) { this.map.removeLayer(this.completedPolyline); this.completedPolyline = null; }
     if (this.remainingPolyline) { this.map.removeLayer(this.remainingPolyline); this.remainingPolyline = null; }
   }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   private findClosestPointIndex(target: [number, number], path: [number, number][]): number {
     let minDist = Infinity, minIndex = 0;
@@ -441,9 +385,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon / 2) ** 2;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 

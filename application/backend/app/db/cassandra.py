@@ -1,15 +1,3 @@
-"""
-db/cassandra.py
-─────────────────────────────────────────────────────────────────────────────
-Cassandra session lifecycle:
-  - connect()   called once at app startup (lifespan)
-  - session()   returns live session, auto-reconnects if stale
-  - disconnect() called at app shutdown (lifespan)
-
-The heartbeat (every 30s) prevents Cassandra from dropping idle connections
-at its default 3-minute timeout — which caused the periodic freeze bug.
-─────────────────────────────────────────────────────────────────────────────
-"""
 
 import time
 import logging
@@ -25,19 +13,13 @@ _cluster: Cluster | None = None
 _session: Session | None = None
 
 
-# ── Public API ─────────────────────────────────────────────────────────────────
 
 def connect() -> None:
-    """Establish connection at app startup. Called from lifespan."""
     global _cluster, _session
     _cluster, _session = _create_connection()
 
 
 def session() -> Session:
-    """
-    Return a live session. Auto-reconnects if the session went stale.
-    Call this in every repository function — never cache the return value.
-    """
     global _cluster, _session
 
     if _session is not None:
@@ -53,12 +35,10 @@ def session() -> Session:
 
 
 def disconnect() -> None:
-    """Graceful shutdown. Called from lifespan."""
     _reset()
     logger.info("Cassandra disconnected")
 
 
-# ── Internal ───────────────────────────────────────────────────────────────────
 
 def _reset() -> None:
     global _cluster, _session
@@ -85,7 +65,7 @@ def _create_connection(retries: int = 30, delay: int = 6):
                 auth_provider=auth,
                 protocol_version=4,
                 connect_timeout=15,
-                idle_heartbeat_interval=30,      # keep-alive ping every 30s
+                idle_heartbeat_interval=30,
                 idle_heartbeat_timeout=10,
                 reconnection_policy=ExponentialReconnectionPolicy(
                     base_delay=1, max_delay=60
@@ -94,7 +74,6 @@ def _create_connection(retries: int = 30, delay: int = 6):
 
             sess = cluster.connect()
 
-            # Wait for keyspace (Spark creates it on first run)
             _wait_for_keyspace(sess)
 
             sess.set_keyspace(settings.cassandra_keyspace)

@@ -1,6 +1,6 @@
 """
 main.py
-─────────────────────────────────────────────────────────────────────────────
+
 Fleet Monitoring — Backend API
 
 Data flow:
@@ -11,8 +11,6 @@ Startup sequence (lifespan):
   2. Compile all prepared statements
   3. Ready to serve requests
 
-This file only wires things together — no business logic here.
-─────────────────────────────────────────────────────────────────────────────
 """
 
 import logging
@@ -33,11 +31,9 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── Startup ───────────────────────────────────────────────────────────────
     db.connect()
     prepare_all()
     yield
-    # ── Shutdown ──────────────────────────────────────────────────────────────
     db.disconnect()
 
 
@@ -56,7 +52,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routes ────────────────────────────────────────────────────────────────────
 app.include_router(trucks.router)
 app.include_router(alerts.router)
 

@@ -12,10 +12,6 @@ from pydantic import BaseModel
 
 
 class TruckLatest(BaseModel):
-    """
-    Latest known state per truck.
-    Table: fleet.truck_latest  (PRIMARY KEY: truck_id)
-    """
     truck_id:               int
     processed_at:           Optional[datetime] = None
     event_time:             Optional[datetime] = None
@@ -41,20 +37,14 @@ class TruckLatest(BaseModel):
     high_consumption:       Optional[bool]     = None
     fuel_consumed_trip:     Optional[float]    = None
     fuel_refueled:          Optional[float]    = None
-    # Enrichment fields (from registry)
     driver_name:            Optional[str]      = None
     truck_model:            Optional[str]      = None
-    # Maintenance fields
     in_maintenance:         Optional[bool]     = None
     maintenance_type:       Optional[str]      = None
     maintenance_desc:       Optional[str]      = None
 
 
 class TruckHistory(BaseModel):
-    """
-    24h time-series per truck.
-    Table: fleet.truck_history  (PRIMARY KEY: truck_id, processed_at DESC)
-    """
     truck_id:               int
     processed_at:           datetime
     event_time:             Optional[datetime] = None
@@ -78,10 +68,6 @@ class TruckHistory(BaseModel):
 
 
 class Alert(BaseModel):
-    """
-    Alert events (7-day TTL).
-    Table: fleet.alerts  (PRIMARY KEY: (truck_id, alert_type), processed_at DESC)
-    """
     truck_id:               int
     alert_type:             str
     processed_at:           datetime

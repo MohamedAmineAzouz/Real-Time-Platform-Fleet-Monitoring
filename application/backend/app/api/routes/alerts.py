@@ -1,8 +1,6 @@
 """
 api/routes/alerts.py
-─────────────────────────────────────────────────────────────────────────────
 GET /alerts      recent alerts across all trucks (alerts dashboard)
-─────────────────────────────────────────────────────────────────────────────
 """
 
 from fastapi import APIRouter, Query

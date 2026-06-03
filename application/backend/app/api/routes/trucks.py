@@ -1,11 +1,9 @@
 """
 api/routes/trucks.py
-─────────────────────────────────────────────────────────────────────────────
 GET /trucks                          all trucks latest state (live map)
 GET /trucks/{truck_id}               single truck
 GET /trucks/{truck_id}/history       24h telemetry time-series
 GET /trucks/{truck_id}/alerts        alerts for one truck
-─────────────────────────────────────────────────────────────────────────────
 """
 
 from typing import Optional

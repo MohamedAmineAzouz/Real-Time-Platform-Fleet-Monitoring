@@ -1,6 +1,5 @@
 <div class="app-shell">
 
-  <!-- Top Navigation Bar -->
   <header class="topbar">
     <div class="logo">
       <button class="mobile-toggle" (click)="isSidebarOpen = !isSidebarOpen">
@@ -50,7 +49,6 @@
 
   <div class="main-layout">
 
-    <!-- Sidebar: Truck List -->
     <aside class="sidebar" [class.mobile-open]="isSidebarOpen">
       <div class="sidebar-header">
         <span>FLEET MONITORING</span>
@@ -111,11 +109,9 @@
       </div>
     </aside>
 
-    <!-- Map -->
     <div class="map-area">
       <div id="map"></div>
 
-      <!-- Detail Panel -->
       <div class="detail-panel floating-panel" *ngIf="selectedTruck"
            [class.dragging]="isDragging"
            (mousedown)="startDragging($event)"
