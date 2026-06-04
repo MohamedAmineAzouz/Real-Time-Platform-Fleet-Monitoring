@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS truck_history (
     maintenance_desc        text,
     PRIMARY KEY (truck_id, processed_at)
 ) WITH CLUSTERING ORDER BY (processed_at DESC)
-  AND default_time_to_live = 86400;
+  AND default_time_to_live = 2592000;
 
 
 CREATE TABLE IF NOT EXISTS alerts (
@@ -89,4 +89,4 @@ CREATE TABLE IF NOT EXISTS alerts (
     maintenance_desc        text,
     PRIMARY KEY ((truck_id, alert_type), processed_at)
 ) WITH CLUSTERING ORDER BY (processed_at DESC)
-  AND default_time_to_live = 604800;
+  AND default_time_to_live = 2592000;

@@ -14,8 +14,7 @@ CREATE TABLE IF NOT EXISTS batch_daily_truck_stats (
     low_fuel_count     int,
     event_count        bigint,
     PRIMARY KEY ((stat_date), truck_id)
-) WITH CLUSTERING ORDER BY (truck_id ASC)
-AND default_time_to_live = 2592000;
+) WITH CLUSTERING ORDER BY (truck_id ASC);
 
 
 CREATE TABLE IF NOT EXISTS batch_driver_performance (
@@ -37,8 +36,7 @@ CREATE TABLE IF NOT EXISTS batch_driver_performance (
     performance_score      double,
     fleet_rank             int,
     PRIMARY KEY ((stat_date), performance_score, driver_id)
-) WITH CLUSTERING ORDER BY (performance_score DESC, driver_id ASC)
-AND default_time_to_live = 2592000;
+) WITH CLUSTERING ORDER BY (performance_score DESC, driver_id ASC);
 
 
 CREATE TABLE IF NOT EXISTS batch_fuel_waste_anomalies (
@@ -53,7 +51,7 @@ CREATE TABLE IF NOT EXISTS batch_fuel_waste_anomalies (
     is_anomaly                  boolean,
     event_count                 bigint,
     PRIMARY KEY ((stat_date), truck_id)
-) WITH default_time_to_live = 2592000;
+);
 
 
 CREATE TABLE IF NOT EXISTS batch_maintenance_flags (
@@ -74,8 +72,7 @@ CREATE TABLE IF NOT EXISTS batch_maintenance_flags (
     maintenance_needed       boolean,
     priority                 text,
     PRIMARY KEY ((stat_date), priority, truck_id)
-) WITH CLUSTERING ORDER BY (priority ASC, truck_id ASC)
-AND default_time_to_live = 2592000;
+) WITH CLUSTERING ORDER BY (priority ASC, truck_id ASC);
 
 
 CREATE TABLE IF NOT EXISTS batch_route_efficiency (
@@ -93,5 +90,4 @@ CREATE TABLE IF NOT EXISTS batch_route_efficiency (
     most_efficient_driver   text,
     best_fuel_per_100km     double,
     PRIMARY KEY ((stat_date), start_city, end_city)
-) WITH CLUSTERING ORDER BY (start_city ASC, end_city ASC)
-AND default_time_to_live = 2592000;
+) WITH CLUSTERING ORDER BY (start_city ASC, end_city ASC);

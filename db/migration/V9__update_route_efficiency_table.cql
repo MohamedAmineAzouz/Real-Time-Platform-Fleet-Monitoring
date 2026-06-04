@@ -14,5 +14,4 @@ CREATE TABLE batch_route_efficiency (
     total_duration_h        double,
     avg_alerts_per_trip     double,
     PRIMARY KEY ((stat_date), start_city, end_city, truck_id, driver_id)
-) WITH CLUSTERING ORDER BY (start_city ASC, end_city ASC, truck_id ASC, driver_id ASC)
-AND default_time_to_live = 2592000;
+) WITH CLUSTERING ORDER BY (start_city ASC, end_city ASC, truck_id ASC, driver_id ASC);
