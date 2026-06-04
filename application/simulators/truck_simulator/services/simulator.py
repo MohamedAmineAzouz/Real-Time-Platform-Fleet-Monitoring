@@ -41,6 +41,39 @@ def _build_maintenance_payload(truck: Truck) -> dict:
     }
 
 
+def _get_distance(city1_name, city2_name):
+    from math import sin, cos, sqrt, atan2, radians
+    c1 = CITIES.get(city1_name)
+    c2 = CITIES.get(city2_name)
+    if not c1 or not c2:
+        return float('inf')
+    
+    # CITIES is (lon, lat)
+    lon1, lat1 = radians(c1[0]), radians(c1[1])
+    lon2, lat2 = radians(c2[0]), radians(c2[1])
+    
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return 6371 * c # km
+
+def _find_next_trajet(current_end_city, db_trajets):
+    # 1. Look for trajets starting exactly at current_end_city
+    matches = [t for t in db_trajets if t["start_city"] == current_end_city]
+    if matches:
+        return random.choice(matches)
+    
+    # 2. Find the closest start_city
+    best_trajet = None
+    min_dist = float('inf')
+    for trajet in db_trajets:
+        dist = _get_distance(current_end_city, trajet["start_city"])
+        if dist < min_dist:
+            min_dist = dist
+            best_trajet = trajet
+    return best_trajet
+
 def start_simulation(num_trucks: int):
     cassandra = get_cassandra_service()
 
@@ -190,12 +223,16 @@ def start_simulation(num_trucks: int):
 
                 truck._maintenance_check_needed = True
 
-                new_trajet = random.choice(db_trajets)
+                new_trajet = _find_next_trajet(truck.end_city, db_trajets)
                 start_city = new_trajet["start_city"]
                 end_city = new_trajet["end_city"]
                 new_route = get_route(CITIES[start_city], CITIES[end_city])
                 if new_route:
-                    print(f"Truck {truck.truck_id} starting new trajet: {start_city} -> {end_city}")
+                    if start_city != truck.end_city:
+                        print(f"Truck {truck.truck_id} finished at {truck.end_city}. Closest start found at {start_city}. Redirecting...")
+                    else:
+                        print(f"Truck {truck.truck_id} continuing from {start_city} to {end_city}")
+                    
                     truck.set_route(
                         new_route,
                         start_city=start_city,
