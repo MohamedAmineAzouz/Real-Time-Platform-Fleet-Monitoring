@@ -5,15 +5,14 @@ from schemas import get_truck_schema
 from cassandra_writer import write_to_cassandra
 from storage_backend import (
    configure_storage,
-   ensure_bucket_exists
+   ensure_bucket_exists,
+   get_storage_uri
 )
 
 import os
 
 def create_spark_session():
-    # Fetch remote host from environment variable
     remote_host = os.getenv("REMOTE_HOST", "spark-master")
-    
     builder = (
         SparkSession.builder
         .appName("FleetSpeedLayer")
@@ -23,17 +22,10 @@ def create_spark_session():
         .config("spark.jars.ivy", "/home/spark/.ivy2")
         .config("spark.cores.max", "6")
     )
-
-    builder = configure_storage(
-        builder
-    )
-
+    builder = configure_storage(builder)
     return builder.getOrCreate()
 
-
-
 def classify_alert(df):
-
     return (
       df
       .withColumn(
@@ -47,10 +39,9 @@ def classify_alert(df):
       .withColumn("is_alert", col("alert_type")!="NORMAL")
     )
 
-
-
 def main():
     ensure_bucket_exists()
+    LAKE_PATH = get_storage_uri()
 
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
@@ -72,33 +63,46 @@ def main():
       .select("data.*")
     )
 
-
     enriched = (
       parsed
       .withColumn("processed_at", current_timestamp() + expr("INTERVAL 1 HOUR"))
       .withColumn("event_time", to_timestamp("timestamp"))
       .withColumn("event_date", to_date("event_time"))
       .withColumn("distance_km", col("distance_km"))
+      # Add constant columns for lake consistency
+      .withColumn("fuel_used", lit(0.0))
+      .withColumn("fuel_consumption_rate", lit(0.0))
+      .withColumn("high_consumption", lit(False))
     )
 
     with_alerts = classify_alert(enriched)
 
-    query = (
+    # ── QUERY 1: Real-time Cassandra (Trigger: 2s) ──────────────────────────
+    query_cas = (
       with_alerts.writeStream
-      .foreachBatch( write_to_cassandra)
+      .foreachBatch(write_to_cassandra)
       .outputMode("append")
-      .option( "checkpointLocation", "/tmp/checkpoints/truck_latest" )
+      .option("checkpointLocation", "/tmp/checkpoints/cassandra")
       .trigger(processingTime="2 seconds")
       .start()
     )
 
-    print(
-      "Streaming started..."
+    # ── QUERY 2: Data Lake MinIO (Trigger: 5m) ─────────────────────────────
+    # TEACHING MOMENT: 
+    # This query buffers 5 minutes of data in the checkpoint.
+    # When it fires, it writes all accumulated rows into one single file!
+    query_lake = (
+      with_alerts.writeStream
+      .format("parquet")
+      .partitionBy("event_date")
+      .option("path", LAKE_PATH)
+      .option("checkpointLocation", "/tmp/checkpoints/lake")
+      .trigger(processingTime="5 minutes")
+      .start()
     )
 
-    query.awaitTermination()
-
-
+    print("🚀 Streaming Sinks Started: Cassandra (2s) & Data Lake (5m)")
+    spark.streams.awaitAnyTermination()
 
 if __name__ == "__main__":
     main()

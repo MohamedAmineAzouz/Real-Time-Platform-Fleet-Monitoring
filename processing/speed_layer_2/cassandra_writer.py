@@ -13,12 +13,11 @@ LAKE_PATH = get_storage_uri()
 def write_to_cassandra(batch_df, batch_id: int):
     """
     Write one latest row per truck to truck_latest, and keep the full micro-batch
-    for truck_history, alerts, and the data lake.
+    for truck_history and alerts.
     """
     t0 = time.time()
 
     if batch_df.rdd.isEmpty():
-        print(f"[batch #{batch_id:05d}] Empty batch")
         return
 
     columns = [
@@ -53,6 +52,7 @@ def write_to_cassandra(batch_df, batch_id: int):
     )
     history_df = base_df.select(columns)
 
+    # 1. Update truck_latest (Live Map)
     (latest_df.write
         .format("org.apache.spark.sql.cassandra")
         .mode("append")
@@ -60,6 +60,7 @@ def write_to_cassandra(batch_df, batch_id: int):
         .save()
     )
 
+    # 2. Update truck_history (24h lines)
     (history_df.write
         .format("org.apache.spark.sql.cassandra")
         .mode("append")
@@ -67,6 +68,7 @@ def write_to_cassandra(batch_df, batch_id: int):
         .save()
     )
 
+    # 3. Update alerts
     alert_columns = [
         "truck_id", "alert_type", "processed_at", "event_time",
         "latitude", "longitude", "speed", "fuel_level", "engine_temp",
@@ -89,21 +91,4 @@ def write_to_cassandra(batch_df, batch_id: int):
             .save()
         )
 
-    (
-        history_df
-        .withColumn("event_date", to_date(col("event_time")))
-        .write
-        .mode("append")
-        .partitionBy("event_date")
-        .parquet(LAKE_PATH)
-    )
-
-    latest_count = latest_df.count()
-    history_count = history_df.count()
-    alert_count = alerts_df.count() if not alerts_df.rdd.isEmpty() else 0
-
-    print(
-        f"[batch #{batch_id:05d}] Wrote {latest_count} truck(s) to {CASSANDRA_KEYSPACE}.{CASSANDRA_TABLE}, "
-        f"{history_count} events to {TRUCK_HISTORY_TABLE}, {alert_count} alerts to {ALERTS_TABLE} "
-        f"({time.time() - t0:.2f}s)"
-    )
+    print(f"[Real-time batch #{batch_id:05d}] Cassandra Updated ({time.time() - t0:.2f}s)")

@@ -34,9 +34,9 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_maintenance_prediction.py"
     description="Scan telemetry patterns to predict maintenance needs",
     default_args={
         "owner": "fleet-maintenance",
-        "retries": 1,
+        "retries": 0,
         "retry_delay": timedelta(minutes=1),
-        "execution_timeout": timedelta(hours=4),
+        "execution_timeout": timedelta(hours=24),
     },
     schedule="30 3 * * *", # 03:30 AM
     start_date=datetime(2026, 5, 21),
@@ -76,9 +76,9 @@ def maintenance_prediction_dag():
             "spark.hadoop.fs.s3a.path.style.access": "true",
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
             
-            "spark.sql.shuffle.partitions": "100",
-            "spark.driver.memory": "2g",
-            "spark.executor.memory": "2g",
+            "spark.sql.shuffle.partitions": "10",
+            "spark.driver.memory": "3g",
+            "spark.executor.memory": "3g",
             
             "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
             "spark.driver.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
