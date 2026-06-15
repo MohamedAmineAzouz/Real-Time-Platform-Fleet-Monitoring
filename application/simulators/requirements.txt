@@ -2,5 +2,5 @@ faker
 requests
 geopy
 python-dotenv
-kafka-python
+kafka-python-ng
 cassandra-driver

@@ -44,10 +44,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private routeDrawToken = 0;
   private activeRouteTruckId: number | null = null;
 
-  public isHistoryVisible = false;
-  public selectedPeriod = '24h';
-  private historyPolyline: any = null;
-
   private readonly OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
   private readonly ANIMATION_DURATION = 1800;
   private readonly EASING = (t: number) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
@@ -130,10 +126,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   selectTruck(truck: Truck): void {
-    if (this.selectedTruck?.truck_id !== truck.truck_id) {
-      this.clearHistoryLine();
-      this.selectedPeriod = '24h';
-    }
     this.selectedTruck = truck;
     this.dragOffsetX = 0;
     this.dragOffsetY = 0;
@@ -160,71 +152,8 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleHistory(): void {
-    if (!this.selectedTruck) return;
-    
-    if (this.isHistoryVisible) {
-      this.clearHistoryLine();
-    } else {
-      this.showHistoryLine(this.selectedTruck.truck_id);
-    }
-  }
-
-  onPeriodChange(event: any): void {
-    this.selectedPeriod = event.target.value;
-    if (this.isHistoryVisible && this.selectedTruck) {
-      this.showHistoryLine(this.selectedTruck.truck_id);
-    }
-  }
-
-  private showHistoryLine(truckId: number): void {
-    const L = (window as any).L;
-    if (!this.map || !L) return;
-
-    this.truckService.getTruckHistory(truckId, this.selectedPeriod, 2000).subscribe({
-      next: (history) => {
-        if (!history || history.length === 0) {
-          this.clearHistoryLine();
-          return;
-        }
-        
-        const latLngs: [number, number][] = history
-          .filter(h => h.latitude && h.longitude)
-          .map(h => [h.latitude!, h.longitude!] as [number, number]);
-
-        if (latLngs.length < 2) {
-          this.clearHistoryLine();
-          return;
-        }
-
-        this.clearHistoryLine();
-        
-        this.historyPolyline = L.polyline(latLngs, {
-          color: '#ff0000',
-          weight: 5,
-          opacity: 0.8,
-          lineCap: 'round',
-          lineJoin: 'round',
-          dashArray: '1, 10'
-        }).addTo(this.map);
-
-        this.isHistoryVisible = true;
-        this.cdr.detectChanges();
-      },
-      error: (err) => console.error('Error fetching history:', err)
-    });
-  }
-
-  private clearHistoryLine(): void {
-    if (this.historyPolyline) {
-      this.map.removeLayer(this.historyPolyline);
-      this.historyPolyline = null;
-    }
-    this.isHistoryVisible = false;
-  }
-
   startDragging(event: MouseEvent): void {
-    if (event.button !== 0 || (event.target as HTMLElement).classList.contains('close-btn') || (event.target as HTMLElement).closest('.history-controls')) return;
+    if (event.button !== 0 || (event.target as HTMLElement).classList.contains('close-btn')) return;
     this.isDragging = true;
     this.startMouseX = event.clientX;
     this.startMouseY = event.clientY;
@@ -252,7 +181,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.activeRouteTruckId = null;
     this.routeDrawToken++;
     this.destroyPolylines();
-    this.clearHistoryLine();
     this.cachedRouteLatLngs = [];
     this.cachedRoute = null;
   }
