@@ -33,6 +33,14 @@ export interface Truck {
   in_maintenance:         boolean;
   maintenance_type:       string | null;
   maintenance_desc:       string | null;
+  prediction?:            MaintenancePrediction | null;
+}
+
+export interface MaintenancePrediction {
+  stat_date:            string;
+  truck_id:             number;
+  predicted_rul_hours:  number;
+  priority:             string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -45,7 +53,11 @@ export class TruckService {
     return this.http.get<Truck[]>(`${this.apiUrl}/trucks`);
   }
 
-  getTruckHistory(truckId: number, limit = 100): Observable<Truck[]> {
-    return this.http.get<Truck[]>(`${this.apiUrl}/trucks/${truckId}/history?limit=${limit}`);
+  getTruckHistory(truckId: number, period = '24h', limit = 1000): Observable<Truck[]> {
+    return this.http.get<Truck[]>(`${this.apiUrl}/trucks/${truckId}/history?period=${period}&limit=${limit}`);
+  }
+
+  getTruckPrediction(truckId: number): Observable<MaintenancePrediction> {
+    return this.http.get<MaintenancePrediction>(`${this.apiUrl}/trucks/${truckId}/prediction`);
   }
 }

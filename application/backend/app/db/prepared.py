@@ -28,6 +28,12 @@ def prepare_all() -> None:
                 "SELECT * FROM alerts "
                 "WHERE truck_id = ? AND alert_type = ? LIMIT ?"
             ),
+
+        "maintenance_prediction_by_truck":
+            sess.prepare(
+                "SELECT * FROM batch_maintenance_prediction "
+                "WHERE stat_date = ? AND truck_id = ? LIMIT 1"
+            ),
     })
 
 

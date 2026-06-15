@@ -37,6 +37,32 @@ def get_by_id(truck_id: int) -> Optional[TruckLatest]:
     return truck
 
 
-def get_history(truck_id: int, limit: int = 100) -> list[TruckHistory]:
-    rows = execute(stmt("truck_history_by_id"), (truck_id, limit))
+def get_history(truck_id: int, period: str = "24h", limit: int = 1000) -> list[TruckHistory]:
+    from datetime import datetime, timedelta
+
+    now = datetime.utcnow()
+    if period == "7d":
+        start_time = now - timedelta(days=7)
+    elif period == "30d":
+        start_time = now - timedelta(days=30)
+    elif period == "this_month":
+        start_time = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:  # default 24h
+        start_time = now - timedelta(hours=24)
+
+    rows = execute(stmt("truck_history_by_period"), (truck_id, start_time, limit))
     return rows_to_models(rows, TruckHistory)
+
+
+def get_maintenance_prediction(truck_id: int) -> Optional[dict]:
+    from datetime import date, timedelta
+    # Predictions are daily, we fetch today's
+    today_str = date.today().strftime("%Y-%m-%d")
+    
+    row = execute(stmt("maintenance_prediction_by_truck"), (today_str, truck_id)).one()
+    if not row:
+        # Fallback to yesterday if today hasn't run yet
+        yesterday_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+        row = execute(stmt("maintenance_prediction_by_truck"), (yesterday_str, truck_id)).one()
+
+    return dict(row._asdict()) if row else None

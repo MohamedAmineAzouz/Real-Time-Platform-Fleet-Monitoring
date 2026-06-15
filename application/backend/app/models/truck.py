@@ -83,3 +83,10 @@ class Alert(BaseModel):
     theft_amount:           Optional[float]    = None
     distance_km:            Optional[float]    = None
     fuel_consumption_rate:  Optional[float]    = None
+
+
+class MaintenancePrediction(BaseModel):
+    stat_date:            str
+    truck_id:             int
+    predicted_rul_hours:  float
+    priority:             str

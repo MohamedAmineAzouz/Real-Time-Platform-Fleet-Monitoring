@@ -138,6 +138,10 @@
             </div>
           </div>
           <div class="route-legend">
+            <div class="legend-item" *ngIf="isHistoryVisible">
+              <div class="legend-line history"></div>
+              <span>{{ selectedPeriod === '24h' ? '24H' : selectedPeriod === '7d' ? '7D' : selectedPeriod === '30d' ? '30D' : 'MONTH' }} ROUTE</span>
+            </div>
             <div class="legend-item">
               <div class="legend-line completed"></div>
               <span>COMPLETED</span>
@@ -146,6 +150,19 @@
               <div class="legend-line remaining"></div>
               <span>REMAINING</span>
             </div>
+          </div>
+          
+          <div class="history-controls">
+            <select class="period-select" (change)="onPeriodChange($event)" [value]="selectedPeriod">
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="this_month">This Month</option>
+            </select>
+            <button class="history-btn" [class.active]="isHistoryVisible" (click)="toggleHistory()">
+              <i class="bi" [ngClass]="isHistoryVisible ? 'bi-eye-slash-fill' : 'bi-eye-fill'"></i>
+              {{ isHistoryVisible ? 'HIDE' : 'SHOW' }}
+            </button>
           </div>
         </div>
 
@@ -192,6 +209,24 @@
               {{ selectedTruck.maintenance_type }}
             </span>
             <span class="di-val small">{{ selectedTruck.maintenance_desc }}</span>
+          </div>
+
+          <!-- AI Prediction Section -->
+          <div class="detail-item full ai-prediction" *ngIf="selectedTruck.prediction"
+               [style.border-left-color]="getPredictionColor(selectedTruck.prediction.priority)">
+            <div class="ai-header">
+              <span class="di-label"><i class="bi bi-robot"></i> SMART MECHANIC AI</span>
+              <span class="ai-badge" [style.background]="getPredictionColor(selectedTruck.prediction.priority)">
+                {{ selectedTruck.prediction.priority }} RISK
+              </span>
+            </div>
+            <div class="ai-content">
+              <div class="ai-rul">
+                <span class="rul-val">{{ selectedTruck.prediction.predicted_rul_hours }}</span>
+                <span class="rul-unit">HOURS UNTIL OVERHEAT</span>
+              </div>
+              <div class="ai-disclaimer">Based on thermal pattern analysis</div>
+            </div>
           </div>
         </div>
       </div>

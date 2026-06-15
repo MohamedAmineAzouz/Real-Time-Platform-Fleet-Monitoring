@@ -378,3 +378,55 @@
 .di-val.small { font-size: 9.5px; word-break: break-all; }
 .di-val.xsmall { font-size: 8px; color: #94a3b8; word-break: break-all; margin-top: 1px; }
 .di-val small { font-size: 8.5px; color: #64748b; }
+
+/* AI Prediction Styles */
+.ai-prediction {
+  background: #fdfcfb;
+  border-left: 4px solid #94a3b8;
+  margin-top: 8px;
+  padding: 8px 10px;
+}
+
+.ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.ai-badge {
+  font-size: 8px;
+  font-weight: 800;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.ai-rul {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.rul-val {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.rul-unit {
+  font-size: 9px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.ai-disclaimer {
+  font-size: 8px;
+  color: #94a3b8;
+  font-style: italic;
+  margin-top: 4px;
+}
