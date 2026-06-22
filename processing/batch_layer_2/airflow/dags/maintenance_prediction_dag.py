@@ -1,11 +1,11 @@
 """
 dags/maintenance_prediction_dag.py
 ─────────────────────────────────────────────────────────────────────────────
-Airflow DAG: Predictive Maintenance Flags
+Airflow DAG: Daily Predictive Maintenance Inference
 ─────────────────────────────────────────────────────────────────────────────
-- Schedule: Daily at 03:30 (After daily stats)
-- Logic: Analyzes telemetry patterns to flag trucks needing maintenance.
-- Output: Cassandra table `batch_maintenance_flags`
+- Schedule: Daily at 03:30 AM (After daily stats)
+- Logic: Runs inference using the frozen production model on today's telemetry.
+- Output: Cassandra table `batch_maintenance_prediction`
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -31,24 +31,24 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_maintenance_prediction.py"
 
 @dag(
     dag_id="maintenance_prediction_dag",
-    description="Scan telemetry patterns to predict maintenance needs",
+    description="Scan current fleet telemetry to predict maintenance needs using frozen model",
     default_args={
         "owner": "fleet-maintenance",
         "retries": 0,
         "retry_delay": timedelta(minutes=1),
-        "execution_timeout": timedelta(hours=24),
+        "execution_timeout": timedelta(hours=12),
     },
-    schedule="30 3 * * *", # 03:30 AM
+    schedule="30 3 * * *", # 03:30 AM daily
     start_date=datetime(2026, 5, 21),
     catchup=False,
     tags=["fleet", "maintenance", "prediction", "spark"],
 )
 def maintenance_prediction_dag():
     
-    start = EmptyOperator(task_id="maintenance_analysis_start")
+    start = EmptyOperator(task_id="maintenance_prediction_start")
 
     @task
-    def get_analysis_dates(**context):
+    def get_prediction_dates(**context):
         logical_date = context.get("logical_date") or context.get("execution_date")
         # Process the full day that just ended
         target_date = logical_date - timedelta(days=1)
@@ -57,14 +57,14 @@ def maintenance_prediction_dag():
             "date_to": target_date.strftime("%Y-%m-%d"),
         }
 
-    dates = get_analysis_dates()
+    dates = get_prediction_dates()
 
     run_prediction_job = SparkSubmitOperator(
         task_id="run_maintenance_prediction_job",
         application=SPARK_JOB_PATH,
         conn_id=SPARK_CONN_ID,
         deploy_mode="client",
-        name="fleet_maintenance_prediction",
+        name="fleet_maintenance_prediction_inference",
         
         conf={
             "spark.cassandra.connection.host": CASSANDRA_HOST,
@@ -89,12 +89,12 @@ def maintenance_prediction_dag():
         },
         
         application_args=[
-            "{{ ti.xcom_pull(task_ids='get_analysis_dates')['date_from'] }}",
-            "{{ ti.xcom_pull(task_ids='get_analysis_dates')['date_to'] }}",
+            "{{ ti.xcom_pull(task_ids='get_prediction_dates')['date_from'] }}",
+            "{{ ti.xcom_pull(task_ids='get_prediction_dates')['date_to'] }}",
         ],
     )
 
-    end = EmptyOperator(task_id="maintenance_analysis_complete")
+    end = EmptyOperator(task_id="maintenance_prediction_complete")
 
     start >> dates >> run_prediction_job >> end
 
