@@ -38,7 +38,7 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_maintenance_prediction.py"
         "retry_delay": timedelta(minutes=1),
         "execution_timeout": timedelta(hours=12),
     },
-    schedule="30 3 * * *", # 03:30 AM daily
+    schedule="30 3 * * *",
     start_date=datetime(2026, 5, 21),
     catchup=False,
     tags=["fleet", "maintenance", "prediction", "spark"],

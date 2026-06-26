@@ -32,7 +32,7 @@ def prepare_all() -> None:
         "maintenance_prediction_by_truck":
             sess.prepare(
                 "SELECT * FROM batch_maintenance_prediction "
-                "WHERE stat_date = ? AND truck_id = ? LIMIT 1"
+                "WHERE stat_date >= ? AND truck_id = ? LIMIT 1"
             ),
     })
 

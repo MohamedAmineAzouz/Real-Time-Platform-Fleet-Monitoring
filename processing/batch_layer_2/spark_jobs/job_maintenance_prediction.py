@@ -65,7 +65,7 @@ def run_job(spark: SparkSession, date_from: str, date_to: str):
         when(col("prediction") < 24, lit("HIGH"))
         .when(col("prediction") < 72, lit("MEDIUM"))
         .otherwise(lit("LOW")).alias("priority"),
-        lit(date_to).alias("stat_date")
+        lit(datetime.now().strftime("%Y-%m-%d %H:%M:%S")).alias("stat_date")
     )
 
     # 4. SAVE TO CASSANDRA

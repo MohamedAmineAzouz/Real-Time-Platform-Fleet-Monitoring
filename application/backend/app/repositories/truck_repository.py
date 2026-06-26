@@ -55,14 +55,25 @@ def get_history(truck_id: int, period: str = "24h", limit: int = 1000) -> list[T
 
 
 def get_maintenance_prediction(truck_id: int) -> Optional[dict]:
-    from datetime import date, timedelta
+    from datetime import date, timedelta, datetime
     # Predictions are daily, we fetch today's
     today_str = date.today().strftime("%Y-%m-%d")
-    
-    row = execute(stmt("maintenance_prediction_by_truck"), (today_str, truck_id)).one()
+    print(datetime.combine(date.today(), datetime.min.time()))
+    row = execute(
+        stmt("maintenance_prediction_by_truck"),
+        ( datetime.combine(date.today(), datetime.min.time()), truck_id)
+    ).one()
+
     if not row:
         # Fallback to yesterday if today hasn't run yet
-        yesterday_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-        row = execute(stmt("maintenance_prediction_by_truck"), (yesterday_str, truck_id)).one()
+        yesterday = datetime.combine(
+            date.today() - timedelta(days=1),
+            datetime.min.time()
+        )
+
+        row = execute(
+            stmt("maintenance_prediction_by_truck"),
+            (yesterday, truck_id)
+        ).one()
 
     return dict(row._asdict()) if row else None

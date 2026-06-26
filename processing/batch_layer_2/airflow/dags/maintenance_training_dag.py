@@ -126,15 +126,15 @@ def maintenance_training_dag():
     )
 
     # Task 5: Evaluate Model Accuracy
-    evaluate_model = SparkSubmitOperator(
-        task_id="evaluate_model_accuracy",
-        application=SPARK_JOB_PATH,
-        conn_id=SPARK_CONN_ID,
-        deploy_mode="client",
-        name="ml_pipeline_evaluate_model",
-        conf=SPARK_CONF,
-        application_args=["--task", "evaluate_model"],
-    )
+    # evaluate_model = SparkSubmitOperator(
+    #     task_id="evaluate_model_accuracy",
+    #     application=SPARK_JOB_PATH,
+    #     conn_id=SPARK_CONN_ID,
+    #     deploy_mode="client",
+    #     name="ml_pipeline_evaluate_model",
+    #     conf=SPARK_CONF,
+    #     application_args=["--task", "evaluate_model"],
+    # )
 
     # Task 6: Model Validation
     validate_model = SparkSubmitOperator(
@@ -149,6 +149,6 @@ def maintenance_training_dag():
 
     end = EmptyOperator(task_id="training_pipeline_complete")
 
-    start >> target_date >> prepare_data >> clean_data >> split_data >> train_model >> evaluate_model >> validate_model >> end
+    start >> target_date >> prepare_data >> clean_data >> split_data >> train_model >> validate_model >> end
 
 maintenance_training_dag()

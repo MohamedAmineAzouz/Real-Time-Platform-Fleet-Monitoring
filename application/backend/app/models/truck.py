@@ -86,7 +86,7 @@ class Alert(BaseModel):
 
 
 class MaintenancePrediction(BaseModel):
-    stat_date:            str
+    stat_date:            datetime
     truck_id:             int
     predicted_rul_hours:  float
     priority:             str
