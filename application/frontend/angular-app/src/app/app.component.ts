@@ -34,6 +34,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private startMouseY = 0;
 
   private intervalId: any;
+  private countdownIntervalId: any;
+  countdownTick = 0; // incremented every second to force countdown refresh
   private map: any;
   private truckStates: Map<number, TruckState> = new Map();
 
@@ -48,19 +50,22 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly ANIMATION_DURATION = 1800;
   private readonly EASING = (t: number) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
-  constructor(private truckService: TruckService, private cdr: ChangeDetectorRef) { }
+  constructor(private truckService: TruckService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.loadLeaflet().then(() => {
       this.initMap();
       this.loadTrucks();
       this.intervalId = setInterval(() => this.loadTrucks(), 2000);
+      // tick every second so the overheat countdown stays live
+      this.countdownIntervalId = setInterval(() => { this.countdownTick++; this.cdr.detectChanges(); }, 1000);
       this.startAnimationLoop();
     });
   }
 
   ngOnDestroy(): void {
     if (this.intervalId) clearInterval(this.intervalId);
+    if (this.countdownIntervalId) clearInterval(this.countdownIntervalId);
     if (this.map) this.map.remove();
   }
 
@@ -74,7 +79,7 @@ export class AppComponent implements OnInit, OnDestroy {
   getDataAge(isoTimestamp: string): string {
     if (!isoTimestamp) return '';
     const diff = Date.now() - new Date(isoTimestamp).getTime();
-    if (diff < 1000) return 'just now';
+    if (diff < 1000)  return 'just now';
     if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
     return `${Math.floor(diff / 60000)}m ago`;
   }
@@ -86,41 +91,41 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getAlertColor(alertType: string): string {
     switch (alertType) {
-      case 'OVERHEAT': return '#ff4d4d';
-      case 'OVERSPEED': return '#ff9500';
+      case 'OVERHEAT':   return '#ff4d4d';
+      case 'OVERSPEED':  return '#ff9500';
       case 'FUEL_THEFT': return '#ff4d4d';
-      case 'FUEL_LEAK': return '#ffdd00';
-      case 'LOW_FUEL': return '#ff9500';
-      default: return '#00e676';
+      case 'FUEL_LEAK':  return '#ffdd00';
+      case 'LOW_FUEL':   return '#ff9500';
+      default:           return '#00e676';
     }
   }
 
   getAlertIcon(alertType: string): string {
     switch (alertType) {
-      case 'OVERHEAT': return 'bi-thermometer-high';
-      case 'OVERSPEED': return 'bi-speedometer2';
+      case 'OVERHEAT':   return 'bi-thermometer-high';
+      case 'OVERSPEED':  return 'bi-speedometer2';
       case 'FUEL_THEFT': return 'bi-exclamation-triangle-fill';
-      case 'FUEL_LEAK': return 'bi-droplet-half';
-      case 'LOW_FUEL': return 'bi-fuel-pump-fill';
-      default: return 'bi-check-circle-fill';
+      case 'FUEL_LEAK':  return 'bi-droplet-half';
+      case 'LOW_FUEL':   return 'bi-fuel-pump-fill';
+      default:           return 'bi-check-circle-fill';
     }
   }
 
   getAlertLabel(alertType: string): string {
     switch (alertType) {
-      case 'OVERHEAT': return 'OVERHEAT';
-      case 'OVERSPEED': return 'OVERSPEED';
+      case 'OVERHEAT':   return 'OVERHEAT';
+      case 'OVERSPEED':  return 'OVERSPEED';
       case 'FUEL_THEFT': return 'THEFT';
-      case 'FUEL_LEAK': return 'FUEL LEAK';
-      case 'LOW_FUEL': return 'LOW FUEL';
-      default: return 'NORMAL';
+      case 'FUEL_LEAK':  return 'FUEL LEAK';
+      case 'LOW_FUEL':   return 'LOW FUEL';
+      default:           return 'NORMAL';
     }
   }
 
   get normalCount(): number { return this.trucks.filter(t => !t.is_alert && !t.in_maintenance).length; }
-  get alertCount(): number { return this.trucks.filter(t => t.is_alert).length; }
+  get alertCount():  number { return this.trucks.filter(t => t.is_alert).length; }
   get maintenanceCount(): number { return this.trucks.filter(t => t.in_maintenance).length; }
-  get avgSpeed(): number {
+  get avgSpeed():    number {
     if (!this.trucks.length) return 0;
     return Math.round(this.trucks.reduce((s, t) => s + t.speed, 0) / this.trucks.length);
   }
@@ -145,11 +150,51 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getPredictionColor(priority: string): string {
     switch (priority) {
-      case 'HIGH': return '#ff4d4d';
+      case 'HIGH':   return '#ff4d4d';
       case 'MEDIUM': return '#ff9500';
-      case 'LOW': return '#00e676';
-      default: return '#94a3b8';
+      case 'LOW':    return '#00e676';
+      default:       return '#94a3b8';
     }
+  }
+
+  /** Format the stat_date (script run date) as a readable label */
+  formatStatDate(statDate: string): string {
+    if (!statDate) return '--';
+    const d = new Date(statDate.replace(' ', 'T'));
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  /** Compute absolute overheat datetime = stat_date + predicted_rul_hours */
+  getOverheatDateTime(statDate: string, rulHours: number): Date | null {
+    if (!statDate || rulHours == null) return null;
+    const base = new Date(statDate.replace(' ', 'T'));
+    if (isNaN(base.getTime())) return null;
+    return new Date(base.getTime() + rulHours * 3600 * 1000);
+  }
+
+  /** Countdown string from now → overheat (stat_date + predicted_rul_hours) */
+  getOverheatCountdown(statDate: string, rulHours: number): string {
+    const target = this.getOverheatDateTime(statDate, rulHours);
+    if (!target) return '--';
+    const diff = target.getTime() - Date.now();
+    if (diff <= 0) return 'OVERDUE';
+    const totalSec = Math.floor(diff / 1000);
+    const days    = Math.floor(totalSec / 86400);
+    const hours   = Math.floor((totalSec % 86400) / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    const seconds = totalSec % 60;
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+  }
+
+  /** Format the absolute overheat datetime for display */
+  formatOverheatTime(statDate: string, rulHours: number): string {
+    const target = this.getOverheatDateTime(statDate, rulHours);
+    if (!target) return '--';
+    return target.toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
   }
 
   startDragging(event: MouseEvent): void {
@@ -251,9 +296,9 @@ export class AppComponent implements OnInit, OnDestroy {
           const updated = data.find(t => t.truck_id === this.selectedTruck!.truck_id);
           if (updated) {
             const posChanged =
-              updated.latitude !== this.selectedTruck.latitude ||
+              updated.latitude  !== this.selectedTruck.latitude ||
               updated.longitude !== this.selectedTruck.longitude;
-
+            
             // Keep the prediction if it was already fetched for this truck
             const currentPrediction = this.selectedTruck.prediction;
             this.selectedTruck = updated;
@@ -318,7 +363,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.truckStates.set(truck.truck_id, {
           marker,
           currentLat: truck.latitude, currentLng: truck.longitude,
-          targetLat: truck.latitude, targetLng: truck.longitude,
+          targetLat:  truck.latitude, targetLng:  truck.longitude,
           lastUpdateTime: now
         });
       }
@@ -341,7 +386,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const isSameRoute =
       this.cachedRoute?.startCity === startCity &&
-      this.cachedRoute?.endCity === endCity;
+      this.cachedRoute?.endCity   === endCity;
 
     if (isSameRoute && this.cachedRouteLatLngs.length > 0) {
       this.updatePolylineSplit(truck);
@@ -413,23 +458,23 @@ export class AppComponent implements OnInit, OnDestroy {
   private getCityCoords(cityName: string): [number, number] | null {
     const cities: Record<string, [number, number]> = {
       // Morocco
-      'Casablanca': [33.5731, -7.5898], 'Rabat': [34.0209, -6.8416],
-      'Marrakech': [31.6295, -8.0089], 'Tanger': [35.7595, -5.8126],
-      'Agadir': [30.4278, -9.5981], 'Fes': [34.0346, -4.9806],
-      'Meknes': [33.8933, -5.5551], 'Oujda': [34.6818, -1.9116],
-      'Nador': [35.1686, -2.9331], 'Kenitra': [34.2610, -6.5897],
-      'El Jadida': [33.2550, -8.5070], 'Safi': [32.2990, -9.2338],
-      'Tetouan': [35.5713, -5.3689], 'Beni Mellal': [32.3378, -6.3700],
-      'Khouribga': [33.6111, -6.9058], 'Settat': [33.0113, -7.6111],
-      'Ifrane': [33.5265, -5.1169], 'Essaouira': [31.5085, -9.7594],
+      'Casablanca': [33.5731, -7.5898], 'Rabat':      [34.0209, -6.8416],
+      'Marrakech':  [31.6295, -8.0089], 'Tanger':     [35.7595, -5.8126],
+      'Agadir':     [30.4278, -9.5981], 'Fes':        [34.0346, -4.9806],
+      'Meknes':     [33.8933, -5.5551], 'Oujda':      [34.6818, -1.9116],
+      'Nador':      [35.1686, -2.9331], 'Kenitra':    [34.2610, -6.5897],
+      'El Jadida':  [33.2550, -8.5070], 'Safi':       [32.2990, -9.2338],
+      'Tetouan':    [35.5713, -5.3689], 'Beni Mellal':[32.3378, -6.3700],
+      'Khouribga':  [33.6111, -6.9058], 'Settat':     [33.0113, -7.6111],
+      'Ifrane':     [33.5265, -5.1169], 'Essaouira':  [31.5085, -9.7594],
       'Ouarzazate': [30.9333, -6.9094], 'Al Hoceima': [35.2513, -3.9343],
-      'Taza': [34.2133, -4.0103], 'Berkane': [34.9186, -2.3222],
-      'Sidi Kacem': [34.2214, -5.7089], 'Sidi Slimane': [34.2667, -5.9267],
-      'Ksar El Kebir': [35.0017, -5.9089], 'Larache': [35.1933, -6.1561],
-      'Asilah': [35.4653, -6.0344], 'Chefchaouen': [35.1689, -5.2689],
-      'Ouazzane': [34.7989, -5.5789], 'Fnideq': [35.8500, -5.3667],
-      "M'diq": [35.6833, -5.3167], 'Martil': [35.6167, -5.2756],
-      'Castillejos': [35.7667, -5.3500], 'Khenifra': [32.9333, -5.6667],
+      'Taza':       [34.2133, -4.0103], 'Berkane':    [34.9186, -2.3222],
+      'Sidi Kacem': [34.2214, -5.7089], 'Sidi Slimane':[34.2667, -5.9267],
+      'Ksar El Kebir':[35.0017, -5.9089], 'Larache':  [35.1933, -6.1561],
+      'Asilah':     [35.4653, -6.0344], 'Chefchaouen':[35.1689, -5.2689],
+      'Ouazzane':   [34.7989, -5.5789], 'Fnideq':     [35.8500, -5.3667],
+      "M'diq":      [35.6833, -5.3167], 'Martil':     [35.6167, -5.2756],
+      'Castillejos':[35.7667, -5.3500], 'Khenifra':   [32.9333, -5.6667],
     };
     return cities[cityName] || null;
   }

@@ -61,9 +61,13 @@
       </div>
 
       <div class="truck-list" *ngIf="!isLoading">
-        <div class="truck-card" *ngFor="let truck of trucks"
-          [class.selected]="selectedTruck?.truck_id === truck.truck_id" [class.anomaly-card]="truck.is_alert"
-          (click)="selectTruck(truck); isSidebarOpen = false">
+        <div
+          class="truck-card"
+          *ngFor="let truck of trucks"
+          [class.selected]="selectedTruck?.truck_id === truck.truck_id"
+          [class.anomaly-card]="truck.is_alert"
+          (click)="selectTruck(truck); isSidebarOpen = false"
+        >
           <div class="card-top">
             <div class="truck-id">
               <i class="bi bi-truck truck-icon"></i>
@@ -72,8 +76,7 @@
             <div *ngIf="truck.in_maintenance" class="anomaly-badge" style="background: #00b4ff">
               <i class="bi bi-wrench-adjustable"></i>&nbsp;MAINTENANCE
             </div>
-            <div *ngIf="!truck.in_maintenance" class="anomaly-badge"
-              [style.background]="getAlertColor(truck.alert_type)">
+            <div *ngIf="!truck.in_maintenance" class="anomaly-badge" [style.background]="getAlertColor(truck.alert_type)">
               <i class="bi" [ngClass]="getAlertIcon(truck.alert_type)"></i>&nbsp;{{ getAlertLabel(truck.alert_type) }}
             </div>
           </div>
@@ -97,8 +100,9 @@
           </div>
 
           <div class="fuel-bar">
-            <div class="fuel-fill" [style.width.%]="truck.fuel_level"
-              [style.background]="truck.fuel_level < 20 ? '#ff4d4d' : truck.fuel_level < 50 ? '#ff9500' : '#00e676'">
+            <div class="fuel-fill"
+                 [style.width.%]="truck.fuel_level"
+                 [style.background]="truck.fuel_level < 20 ? '#ff4d4d' : truck.fuel_level < 50 ? '#ff9500' : '#00e676'">
             </div>
           </div>
         </div>
@@ -108,9 +112,12 @@
     <div class="map-area">
       <div id="map"></div>
 
-      <div class="detail-panel floating-panel" *ngIf="selectedTruck" [class.dragging]="isDragging"
-        (mousedown)="startDragging($event)" [style.border-color]="getAlertColor(selectedTruck.alert_type)"
-        [style.left.px]="panelLeft" [style.top.px]="panelTop">
+      <div class="detail-panel floating-panel" *ngIf="selectedTruck"
+           [class.dragging]="isDragging"
+           (mousedown)="startDragging($event)"
+           [style.border-color]="getAlertColor(selectedTruck.alert_type)"
+           [style.left.px]="panelLeft"
+           [style.top.px]="panelTop">
         <button class="close-btn" (click)="closeSidebar()">✕</button>
 
         <div class="detail-header">
@@ -170,8 +177,7 @@
             <span class="di-val small">{{ selectedTruck.driver_name }}</span>
           </div>
           <div class="detail-item full" *ngIf="selectedTruck.theft">
-            <span class="di-label text-danger"><i class="bi bi-exclamation-triangle-fill"></i> FUEL THEFT
-              DETECTED</span>
+            <span class="di-label text-danger"><i class="bi bi-exclamation-triangle-fill"></i> FUEL THEFT DETECTED</span>
             <span class="di-val" style="color:#ff4d4d">
               AMOUNT: {{ selectedTruck.theft_amount | number:'1.1-1' }}%
             </span>
@@ -190,7 +196,7 @@
 
           <!-- AI Prediction Section -->
           <div class="detail-item full ai-prediction" *ngIf="selectedTruck.prediction"
-            [style.border-left-color]="getPredictionColor(selectedTruck.prediction.priority)">
+               [style.border-left-color]="getPredictionColor(selectedTruck.prediction.priority)">
             <div class="ai-header">
               <span class="di-label"><i class="bi bi-robot"></i> SMART MECHANIC AI</span>
               <span class="ai-badge" [style.background]="getPredictionColor(selectedTruck.prediction.priority)">
@@ -198,11 +204,27 @@
               </span>
             </div>
             <div class="ai-content">
-              <div class="ai-rul">
-                <span class="rul-val">{{ selectedTruck.prediction.predicted_rul_hours }}</span>
-                <span class="rul-unit">HOURS UNTIL OVERHEAT</span>
+              <!-- Countdown: (stat_date + predicted_rul_hours) − now -->
+              <div class="ai-countdown-label">TIME UNTIL OVERHEAT</div>
+              <div class="ai-countdown"
+                   [style.color]="getPredictionColor(selectedTruck.prediction.priority)">
+                {{ getOverheatCountdown(selectedTruck.prediction.stat_date, selectedTruck.prediction.predicted_rul_hours) }}
               </div>
-              <div class="ai-disclaimer">Based on thermal pattern analysis</div>
+              <div class="ai-meta-row">
+                <div class="ai-meta-item">
+                  <span class="ai-meta-label"><i class="bi bi-calendar-event"></i> PREDICTED ON</span>
+                  <span class="ai-meta-val">{{ formatStatDate(selectedTruck.prediction.stat_date) }}</span>
+                </div>
+                <div class="ai-meta-item">
+                  <span class="ai-meta-label"><i class="bi bi-alarm"></i> OVERHEAT AT</span>
+                  <span class="ai-meta-val">{{ formatOverheatTime(selectedTruck.prediction.stat_date, selectedTruck.prediction.predicted_rul_hours) }}</span>
+                </div>
+                <div class="ai-meta-item">
+                  <span class="ai-meta-label"><i class="bi bi-hourglass-split"></i> RUL (hrs)</span>
+                  <span class="ai-meta-val">{{ selectedTruck.prediction.predicted_rul_hours }}</span>
+                </div>
+              </div>
+              <div class="ai-disclaimer">Based on thermal pattern analysis · Runs daily at 03:30</div>
             </div>
           </div>
         </div>
