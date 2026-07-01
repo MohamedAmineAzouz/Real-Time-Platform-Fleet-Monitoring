@@ -10,7 +10,7 @@ GET /trucks/{truck_id}/prediction    AI maintenance prediction
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
-from app.models.truck import TruckLatest, TruckHistory, Alert, MaintenancePrediction
+from app.models.truck import TruckLatest, TruckHistory, Alert, MaintenancePrediction, ETAPrediction
 from app.repositories import truck_repository, alert_repository
 
 router = APIRouter(prefix="/trucks", tags=["Trucks"])
@@ -20,6 +20,18 @@ router = APIRouter(prefix="/trucks", tags=["Trucks"])
 def get_all_trucks():
     """Latest position + telemetry for every truck. Powers the live map."""
     return truck_repository.get_all()
+
+
+@router.get("/eta/prediction", response_model=Optional[ETAPrediction])
+def get_eta_prediction(
+    start_city: str = Query(..., description="Start city of the corridor"),
+    end_city: str = Query(..., description="End city of the corridor")
+):
+    """Fetch the latest AI ETA prediction for a corridor."""
+    prediction = truck_repository.get_eta_prediction(start_city, end_city)
+    if not prediction:
+        return None
+    return prediction
 
 
 @router.get("/{truck_id}", response_model=TruckLatest)

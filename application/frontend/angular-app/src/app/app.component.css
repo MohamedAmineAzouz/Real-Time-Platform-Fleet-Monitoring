@@ -463,3 +463,144 @@
   font-style: italic;
   margin-top: 2px;
 }
+
+/* AI ETA Prediction Styles */
+.eta-prediction {
+  background: #fdfcfb;
+  border-left: 4px solid #00b4ff;
+  margin-top: 8px;
+  padding: 10px 10px 8px;
+}
+
+.eta-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.eta-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 7.5px;
+  font-weight: 800;
+  color: white;
+  padding: 3px 7px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Hero arrival block ── */
+.eta-arrival-block {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.eta-arrival-label {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.eta-arrival-date {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  margin-bottom: 5px;
+}
+
+.eta-arrival-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.eta-arrival-sub strong {
+  color: #334155;
+  font-weight: 600;
+}
+
+/* ── Metrics grid ── */
+.eta-meta-row {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+
+.eta-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 68px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.eta-meta-label {
+  font-size: 7px;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.eta-meta-val {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.eta-disclaimer {
+  font-size: 7.5px;
+  color: #94a3b8;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Refined AI Prediction panel */
+.ai-prediction,
+.eta-prediction {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.ai-meta-item.full-span,
+.eta-meta-item.full-span {
+  flex: none;
+  width: 100%;
+}
+
+.ai-countdown {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.eta-arrival-date {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.ai-meta-item,
+.eta-meta-item {
+  background: rgba(0,0,0,0.025);
+  border: 1px solid rgba(0,0,0,0.04);
+}

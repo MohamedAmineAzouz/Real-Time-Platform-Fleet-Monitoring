@@ -90,3 +90,16 @@ class MaintenancePrediction(BaseModel):
     truck_id:             int
     predicted_rul_hours:  float
     priority:             str
+
+
+class ETAPrediction(BaseModel):
+    start_city:           str
+    end_city:             str
+    stat_date:            str
+    hour_of_day:          int
+    day_of_week:          int
+    predicted_eta_hours:  float
+    avg_speed_kmh:        float
+    distance_km:          float
+    confidence:           str
+    sample_count:         int

@@ -34,6 +34,7 @@ export interface Truck {
   maintenance_type:       string | null;
   maintenance_desc:       string | null;
   prediction?:            MaintenancePrediction | null;
+  etaPrediction?:         ETAPrediction | null;
 }
 
 export interface MaintenancePrediction {
@@ -41,6 +42,19 @@ export interface MaintenancePrediction {
   truck_id:             number;
   predicted_rul_hours:  number;
   priority:             string;
+}
+
+export interface ETAPrediction {
+  start_city:           string;
+  end_city:             string;
+  stat_date:            string;
+  hour_of_day:          number;
+  day_of_week:          number;
+  predicted_eta_hours:  number;
+  avg_speed_kmh:        number;
+  distance_km:          number;
+  confidence:           string;
+  sample_count:         number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -60,4 +74,8 @@ export class TruckService {
   getTruckPrediction(truckId: number): Observable<MaintenancePrediction> {
     return this.http.get<MaintenancePrediction>(`${this.apiUrl}/trucks/${truckId}/prediction`);
   }
-}
+
+  getTruckEtaPrediction(startCity: string, endCity: string): Observable<ETAPrediction> {
+    return this.http.get<ETAPrediction>(`${this.apiUrl}/trucks/eta/prediction?start_city=${encodeURIComponent(startCity)}&end_city=${encodeURIComponent(endCity)}`);
+  }
+}

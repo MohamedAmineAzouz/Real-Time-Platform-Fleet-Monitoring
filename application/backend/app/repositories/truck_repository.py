@@ -77,3 +77,12 @@ def get_maintenance_prediction(truck_id: int) -> Optional[dict]:
         ).one()
 
     return dict(row._asdict()) if row else None
+
+
+def get_eta_prediction(start_city: str, end_city: str) -> Optional[dict]:
+    row = execute(
+        stmt("eta_prediction_by_corridor"),
+        (start_city, end_city)
+    ).one()
+    return dict(row._asdict()) if row else None
+

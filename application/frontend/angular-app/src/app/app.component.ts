@@ -141,6 +141,16 @@ export class AppComponent implements OnInit, OnDestroy {
       error: () => { if (this.selectedTruck) this.selectedTruck.prediction = null; }
     });
 
+    // Fetch AI ETA Prediction
+    if (truck.start_city && truck.end_city && truck.start_city !== truck.end_city) {
+      this.truckService.getTruckEtaPrediction(truck.start_city, truck.end_city).subscribe({
+        next: (pred) => { if (this.selectedTruck) this.selectedTruck.etaPrediction = pred; },
+        error: () => { if (this.selectedTruck) this.selectedTruck.etaPrediction = null; }
+      });
+    } else {
+      if (this.selectedTruck) this.selectedTruck.etaPrediction = null;
+    }
+
     if (this.map) {
       this.map.flyTo([truck.latitude, truck.longitude], 12, { duration: 1.2, easeLinearity: 0.25 });
       this.ensureRouteLines(truck);
@@ -153,6 +163,15 @@ export class AppComponent implements OnInit, OnDestroy {
       case 'HIGH':   return '#ff4d4d';
       case 'MEDIUM': return '#ff9500';
       case 'LOW':    return '#00e676';
+      default:       return '#94a3b8';
+    }
+  }
+
+  getEtaConfidenceColor(confidence: string): string {
+    switch (confidence) {
+      case 'HIGH':   return '#00e676';
+      case 'MEDIUM': return '#ff9500';
+      case 'LOW':    return '#ff4d4d';
       default:       return '#94a3b8';
     }
   }
@@ -195,6 +214,56 @@ export class AppComponent implements OnInit, OnDestroy {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
+  }
+
+  /** Compute estimated arrival datetime = NOW + predicted_eta_hours
+   *  (stat_date is the model's inference date — not a departure time.
+   *   The prediction means "this corridor takes X hours from now." ) */
+  getEtaArrivalDateTime(statDate: string, etaHours: number): Date | null {
+    if (etaHours == null) return null;
+    return new Date(Date.now() + etaHours * 3600 * 1000);
+  }
+
+  /** Countdown string from now → estimated arrival (stat_date + predicted_eta_hours) */
+  getEtaCountdown(statDate: string, etaHours: number): string {
+    void this.countdownTick; // trigger refresh every second
+    const target = this.getEtaArrivalDateTime(statDate, etaHours);
+    if (!target) return '--';
+    const diff = target.getTime() - Date.now();
+    if (diff <= 0) return 'ARRIVED';
+    const totalSec = Math.floor(diff / 1000);
+    const days    = Math.floor(totalSec / 86400);
+    const hours   = Math.floor((totalSec % 86400) / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    const seconds = totalSec % 60;
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+  }
+
+  /** Format the absolute ETA arrival datetime for display */
+  formatEtaArrivalTime(statDate: string, etaHours: number): string {
+    const target = this.getEtaArrivalDateTime(statDate, etaHours);
+    if (!target) return '--';
+    return target.toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  /** Rich arrival datetime: "Mon, 30 Jun 2026 · 18:45" */
+  formatEtaArrivalFull(statDate: string, etaHours: number): string {
+    const target = this.getEtaArrivalDateTime(statDate, etaHours);
+    if (!target) return '--';
+    const days   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dow   = days[target.getDay()];
+    const day   = target.getDate();
+    const month = months[target.getMonth()];
+    const year  = target.getFullYear();
+    const hh    = String(target.getHours()).padStart(2, '0');
+    const mm    = String(target.getMinutes()).padStart(2, '0');
+    return `${dow}, ${day} ${month} ${year} · ${hh}:${mm}`;
   }
 
   startDragging(event: MouseEvent): void {
@@ -301,8 +370,10 @@ export class AppComponent implements OnInit, OnDestroy {
             
             // Keep the prediction if it was already fetched for this truck
             const currentPrediction = this.selectedTruck.prediction;
+            const currentEtaPrediction = this.selectedTruck.etaPrediction;
             this.selectedTruck = updated;
             this.selectedTruck.prediction = currentPrediction;
+            this.selectedTruck.etaPrediction = currentEtaPrediction;
 
             if (posChanged) this.updatePolylineSplit(updated);
             const state = this.truckStates.get(updated.truck_id);

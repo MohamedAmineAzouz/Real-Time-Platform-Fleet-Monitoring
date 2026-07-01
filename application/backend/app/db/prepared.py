@@ -34,6 +34,11 @@ def prepare_all() -> None:
                 "SELECT * FROM batch_maintenance_prediction "
                 "WHERE stat_date >= ? AND truck_id = ? LIMIT 1"
             ),
+        "eta_prediction_by_corridor":
+            sess.prepare(
+                "SELECT * FROM batch_eta_prediction "
+                "WHERE start_city = ? AND end_city = ? LIMIT 1"
+            ),
     })
 
 

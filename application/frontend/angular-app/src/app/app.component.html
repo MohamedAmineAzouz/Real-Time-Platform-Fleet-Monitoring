@@ -196,7 +196,7 @@
 
           <!-- AI Prediction Section -->
           <div class="detail-item full ai-prediction" *ngIf="selectedTruck.prediction"
-               [style.border-left-color]="getPredictionColor(selectedTruck.prediction.priority)">
+              [style.border-left-color]="getPredictionColor(selectedTruck.prediction.priority)">
             <div class="ai-header">
               <span class="di-label"><i class="bi bi-robot"></i> SMART MECHANIC AI</span>
               <span class="ai-badge" [style.background]="getPredictionColor(selectedTruck.prediction.priority)">
@@ -204,27 +204,52 @@
               </span>
             </div>
             <div class="ai-content">
-              <!-- Countdown: (stat_date + predicted_rul_hours) − now -->
               <div class="ai-countdown-label">TIME UNTIL OVERHEAT</div>
               <div class="ai-countdown"
-                   [style.color]="getPredictionColor(selectedTruck.prediction.priority)">
+                  [style.color]="getPredictionColor(selectedTruck.prediction.priority)">
                 {{ getOverheatCountdown(selectedTruck.prediction.stat_date, selectedTruck.prediction.predicted_rul_hours) }}
               </div>
               <div class="ai-meta-row">
-                <div class="ai-meta-item">
-                  <span class="ai-meta-label"><i class="bi bi-calendar-event"></i> PREDICTED ON</span>
-                  <span class="ai-meta-val">{{ formatStatDate(selectedTruck.prediction.stat_date) }}</span>
-                </div>
-                <div class="ai-meta-item">
+                <div class="ai-meta-item full-span">
                   <span class="ai-meta-label"><i class="bi bi-alarm"></i> OVERHEAT AT</span>
                   <span class="ai-meta-val">{{ formatOverheatTime(selectedTruck.prediction.stat_date, selectedTruck.prediction.predicted_rul_hours) }}</span>
                 </div>
-                <div class="ai-meta-item">
-                  <span class="ai-meta-label"><i class="bi bi-hourglass-split"></i> RUL (hrs)</span>
-                  <span class="ai-meta-val">{{ selectedTruck.prediction.predicted_rul_hours }}</span>
-                </div>
               </div>
-              <div class="ai-disclaimer">Based on thermal pattern analysis · Runs daily at 03:30</div>
+            </div>
+          </div>
+
+          <!-- AI ETA Prediction Section -->
+          <div class="detail-item full eta-prediction" *ngIf="selectedTruck.etaPrediction"
+              [style.border-left-color]="getEtaConfidenceColor(selectedTruck.etaPrediction.confidence)">
+            <div class="eta-header">
+              <span class="di-label"><i class="bi bi-compass"></i> SMART ETA AI</span>
+              <span class="eta-badge" [style.background]="getEtaConfidenceColor(selectedTruck.etaPrediction.confidence)">
+                <i class="bi bi-check-circle-fill"></i> {{ selectedTruck.etaPrediction.confidence }} CONFIDENCE
+              </span>
+            </div>
+
+            <div class="eta-arrival-block">
+              <div class="eta-arrival-label">
+                <i class="bi bi-geo-fill"></i> EXPECTED ARRIVAL
+              </div>
+              <div class="eta-arrival-date"
+                  [style.color]="getEtaConfidenceColor(selectedTruck.etaPrediction.confidence)">
+                {{ formatEtaArrivalFull(selectedTruck.etaPrediction.stat_date, selectedTruck.etaPrediction.predicted_eta_hours) }}
+              </div>
+              <div class="eta-arrival-sub">
+                <i class="bi bi-hourglass-split"></i>
+                Travel time: <strong>{{ selectedTruck.etaPrediction.predicted_eta_hours | number:'1.1-2' }} hrs</strong>
+                &nbsp;·&nbsp;
+                <i class="bi bi-pin-map-fill"></i>
+                <strong>{{ selectedTruck.etaPrediction.distance_km | number:'1.0-0' }} km</strong>
+              </div>
+            </div>
+
+            <div class="eta-meta-row">
+              <div class="eta-meta-item full-span">
+                <span class="eta-meta-label"><i class="bi bi-speedometer2"></i> AVG SPEED</span>
+                <span class="eta-meta-val">{{ selectedTruck.etaPrediction.avg_speed_kmh | number:'1.0-0' }} km/h</span>
+              </div>
             </div>
           </div>
         </div>
