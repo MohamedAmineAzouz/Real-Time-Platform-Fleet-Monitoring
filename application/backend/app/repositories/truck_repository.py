@@ -2,6 +2,8 @@ from typing import Optional
 from app.db.prepared import get as stmt
 from app.models.truck import TruckLatest, TruckHistory
 from ._base import execute, rows_to_models
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 
 def get_all() -> list[TruckLatest]:
@@ -86,3 +88,31 @@ def get_eta_prediction(start_city: str, end_city: str) -> Optional[dict]:
     ).one()
     return dict(row._asdict()) if row else None
 
+
+
+def get_trip_start_time(
+    truck_id: int,
+    start_city: str,
+    end_city: str,
+) -> Optional[str]:
+
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+
+    rows = execute(
+        stmt("trip_start_by_truck"),
+        (truck_id, since),
+    )
+
+    trip_start = None
+
+    for row in rows:
+        if row.start_city == start_city and row.end_city == end_city:
+            # Keep updating while we're still on the same corridor.
+            # Since rows are newest -> oldest, the last matching row
+            # is the departure time.
+            trip_start = row.event_time
+        else:
+            # Corridor changed.
+            break
+    print(f"Trip start for truck {truck_id} from {start_city} to {end_city}: {trip_start}")
+    return trip_start.isoformat() if trip_start else None

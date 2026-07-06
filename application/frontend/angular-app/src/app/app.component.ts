@@ -147,8 +147,25 @@ export class AppComponent implements OnInit, OnDestroy {
         next: (pred) => { if (this.selectedTruck) this.selectedTruck.etaPrediction = pred; },
         error: () => { if (this.selectedTruck) this.selectedTruck.etaPrediction = null; }
       });
+
+      // Fetch departure time from dedicated server-side endpoint (lean: 1 timestamp)
+      this.truckService.getTripStartTime(truck.truck_id, truck.start_city, truck.end_city).subscribe({
+        next: (res) => {
+          if (this.selectedTruck && this.selectedTruck.truck_id === truck.truck_id) {
+            this.selectedTruck.tripStartTime = res ? new Date(res.trip_start_time) : null;
+          }
+        },
+        error: () => {
+          if (this.selectedTruck && this.selectedTruck.truck_id === truck.truck_id) {
+            this.selectedTruck.tripStartTime = null;
+          }
+        }
+      });
     } else {
-      if (this.selectedTruck) this.selectedTruck.etaPrediction = null;
+      if (this.selectedTruck) {
+        this.selectedTruck.etaPrediction = null;
+        this.selectedTruck.tripStartTime = null;
+      }
     }
 
     if (this.map) {
@@ -216,12 +233,13 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Compute estimated arrival datetime = NOW + predicted_eta_hours
-   *  (stat_date is the model's inference date — not a departure time.
-   *   The prediction means "this corridor takes X hours from now." ) */
+  /** Compute estimated arrival datetime = tripStartTime + predicted_eta_hours */
   getEtaArrivalDateTime(statDate: string, etaHours: number): Date | null {
     if (etaHours == null) return null;
-    return new Date(Date.now() + etaHours * 3600 * 1000);
+    const baseTime = (this.selectedTruck && this.selectedTruck.tripStartTime)
+      ? this.selectedTruck.tripStartTime.getTime()
+      : Date.now();
+    return new Date(baseTime + etaHours * 3600 * 1000);
   }
 
   /** Countdown string from now → estimated arrival (stat_date + predicted_eta_hours) */
@@ -371,9 +389,11 @@ export class AppComponent implements OnInit, OnDestroy {
             // Keep the prediction if it was already fetched for this truck
             const currentPrediction = this.selectedTruck.prediction;
             const currentEtaPrediction = this.selectedTruck.etaPrediction;
+            const currentTripStartTime = this.selectedTruck.tripStartTime;
             this.selectedTruck = updated;
             this.selectedTruck.prediction = currentPrediction;
             this.selectedTruck.etaPrediction = currentEtaPrediction;
+            this.selectedTruck.tripStartTime = currentTripStartTime;
 
             if (posChanged) this.updatePolylineSplit(updated);
             const state = this.truckStates.get(updated.truck_id);

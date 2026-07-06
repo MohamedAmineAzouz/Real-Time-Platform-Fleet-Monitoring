@@ -35,6 +35,7 @@ export interface Truck {
   maintenance_desc:       string | null;
   prediction?:            MaintenancePrediction | null;
   etaPrediction?:         ETAPrediction | null;
+  tripStartTime?:         Date | null;
 }
 
 export interface MaintenancePrediction {
@@ -78,4 +79,10 @@ export class TruckService {
   getTruckEtaPrediction(startCity: string, endCity: string): Observable<ETAPrediction> {
     return this.http.get<ETAPrediction>(`${this.apiUrl}/trucks/eta/prediction?start_city=${encodeURIComponent(startCity)}&end_city=${encodeURIComponent(endCity)}`);
   }
-}
+
+  getTripStartTime(truckId: number, startCity: string, endCity: string): Observable<{ trip_start_time: string } | null> {
+    return this.http.get<{ trip_start_time: string } | null>(
+      `${this.apiUrl}/trucks/${truckId}/trip-start?start_city=${encodeURIComponent(startCity)}&end_city=${encodeURIComponent(endCity)}`
+    );
+  }
+}

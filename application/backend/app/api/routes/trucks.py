@@ -5,6 +5,7 @@ GET /trucks/{truck_id}               single truck
 GET /trucks/{truck_id}/history       telemetry time-series
 GET /trucks/{truck_id}/alerts        alerts for one truck
 GET /trucks/{truck_id}/prediction    AI maintenance prediction
+GET /trucks/{truck_id}/trip-start    departure time of the active corridor
 """
 
 from typing import Optional
@@ -73,3 +74,20 @@ def get_truck_maintenance_prediction(truck_id: int):
     if not prediction:
         return None
     return prediction
+
+
+@router.get("/{truck_id}/trip-start")
+def get_trip_start(
+    truck_id: int,
+    start_city: str = Query(..., description="Current start city of the truck's corridor"),
+    end_city:   str = Query(..., description="Current end city of the truck's corridor"),
+):
+    """
+    Return the departure datetime of the truck's active corridor.
+    Scans at most 500 history rows server-side and stops as soon as the
+    route changes — returns only a single ISO-8601 timestamp.
+    """
+    ts = truck_repository.get_trip_start_time(truck_id, start_city, end_city)
+    if not ts:
+        return None
+    return {"trip_start_time": ts}

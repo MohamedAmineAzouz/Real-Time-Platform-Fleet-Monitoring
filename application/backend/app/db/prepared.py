@@ -22,6 +22,10 @@ def prepare_all() -> None:
             sess.prepare(
                 "SELECT * FROM truck_history WHERE truck_id = ? LIMIT ?"
             ),
+        "truck_history_by_period":
+            sess.prepare(
+                "SELECT * FROM truck_history WHERE truck_id = ? AND processed_at >= ? LIMIT ?"
+            ),
 
         "alerts_by_truck_and_type":
             sess.prepare(
@@ -39,7 +43,13 @@ def prepare_all() -> None:
                 "SELECT * FROM batch_eta_prediction "
                 "WHERE start_city = ? AND end_city = ? LIMIT 1"
             ),
-    })
+        "trip_start_by_truck":
+            sess.prepare(
+                "SELECT truck_id, processed_at, event_time, start_city, end_city "
+                "FROM truck_history "
+                "WHERE truck_id = ? AND processed_at >= ?"
+            ),
+})
 
 
 def get(name: str) -> PreparedStatement:
