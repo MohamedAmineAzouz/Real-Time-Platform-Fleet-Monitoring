@@ -1,21 +1,6 @@
 FROM maven:3.9-eclipse-temurin-17-alpine AS deps
 
-# Create a minimal POM to resolve cassandra-jdbc-wrapper + ALL transitive deps
-RUN mkdir -p /build && cat > /build/pom.xml << 'EOF'
-<project>
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>flyway.deps</groupId>
-  <artifactId>cassandra-driver-deps</artifactId>
-  <version>1.0</version>
-  <dependencies>
-    <dependency>
-      <groupId>com.ing.data</groupId>
-      <artifactId>cassandra-jdbc-wrapper</artifactId>
-      <version>4.11.1</version>
-    </dependency>
-  </dependencies>
-</project>
-EOF
+COPY pom.xml /build/pom.xml
 
 # Copy ALL transitive jars into /deps (flat directory)
 RUN mvn -f /build/pom.xml \

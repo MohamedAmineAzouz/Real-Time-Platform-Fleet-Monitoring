@@ -2,7 +2,7 @@
 -- PRIMARY KEY:
 -- Partition Key: stat_date (Grouping by day)
 -- Clustering Column: truck_id (Allowing direct lookup per truck)
-DROP TABLE batch_maintenance_prediction;
+DROP TABLE IF EXISTS batch_maintenance_prediction;
 
 CREATE TABLE batch_maintenance_prediction (
     stat_date            timestamp,

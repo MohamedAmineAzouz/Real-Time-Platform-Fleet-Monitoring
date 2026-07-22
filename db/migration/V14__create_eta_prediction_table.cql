@@ -1,4 +1,3 @@
-
 CREATE TABLE IF NOT EXISTS batch_eta_prediction (
     start_city           text,
     end_city             text,
