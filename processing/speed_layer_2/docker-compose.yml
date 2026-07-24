@@ -5,6 +5,7 @@ services:
   spark-master:
     build: .
     container_name: spark-master
+    restart: unless-stopped
     user: root
     ports:
       - "8084:8080"   # Spark Master UI
@@ -24,6 +25,7 @@ services:
   spark-worker-1:
     build: .
     container_name: spark-worker-1
+    restart: unless-stopped
     depends_on:
       - spark-master
     environment:
@@ -43,6 +45,7 @@ services:
   spark-worker-2:
     build: .
     container_name: spark-worker-2
+    restart: unless-stopped
     depends_on:
       - spark-master
     environment:
@@ -63,6 +66,7 @@ services:
   spark-worker-3:
     build: .
     container_name: spark-worker-3
+    restart: unless-stopped
     depends_on:
       - spark-master
     environment:
@@ -83,6 +87,7 @@ services:
   streaming-processor:
     build: .
     container_name: streaming-processor
+    restart: unless-stopped
     user: root
     depends_on:
       - spark-master
