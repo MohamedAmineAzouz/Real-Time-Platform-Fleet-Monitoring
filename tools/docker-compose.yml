@@ -206,6 +206,8 @@ services:
       CASSANDRA_HOST:     ${CASSANDRA_HOST:-cassandra}
       CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
       CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
+      OLLAMA_HOST:        ${OLLAMA_HOST:-http://ollama:11434}
+      OLLAMA_MODEL:       ${OLLAMA_MODEL:-llama3.2}
     networks:
       - iot_network
     depends_on:
@@ -213,6 +215,18 @@ services:
         condition: service_healthy
       data-seed:
         condition: service_completed_successfully
+
+  # ── GenAI Layer: Ollama (Local LLM Server) ─────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - iot_network
+    restart: unless-stopped
 
   # ── Portainer: Container Management UI ─────────────────────────────────────
   portainer:
@@ -232,6 +246,7 @@ volumes:
   kafka-data:
   portainer_data:
   dbgate_data:
+  ollama_data:
 
 networks:
   iot_network:

@@ -2,3 +2,7 @@ streamlit
 pandas
 plotly
 cassandra-driver
+langchain
+langchain-community
+langchain-ollama
+tabulate
