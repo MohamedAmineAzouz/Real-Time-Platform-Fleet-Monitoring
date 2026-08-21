@@ -39,9 +39,26 @@ def classify_alert(df):
       .withColumn("is_alert", col("alert_type")!="NORMAL")
     )
 
+def write_to_minio_lake(batch_df, batch_id):
+    LAKE_PATH = get_storage_uri()
+
+    if batch_df.isEmpty():
+        return
+    try:
+        (
+            batch_df.write
+            .mode("append")
+            .partitionBy("event_date")
+            .parquet(LAKE_PATH)
+        )
+        print(f"✅ Data Lake: {batch_df.count()} lignes écrites dans MinIO (Batch {batch_id})")
+    except Exception as e:
+        print(f"❌ Erreur écriture MinIO Data Lake: {e}")
+
+
 def main():
     ensure_bucket_exists()
-    LAKE_PATH = get_storage_uri()
+    # LAKE_PATH = get_storage_uri()
 
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
@@ -88,15 +105,11 @@ def main():
     )
 
     # ── QUERY 2: Data Lake MinIO (Trigger: 5m) ─────────────────────────────
-    # TEACHING MOMENT: 
-    # This query buffers 5 minutes of data in the checkpoint.
-    # When it fires, it writes all accumulated rows into one single file!
     query_lake = (
       with_alerts.writeStream
-      .format("parquet")
-      .partitionBy("event_date")
-      .option("path", LAKE_PATH)
-      .option("checkpointLocation", "/tmp/checkpoints/lake")
+      .foreachBatch(write_to_minio_lake)
+      .outputMode("append")
+      .option("checkpointLocation", "/tmp/checkpoints/lake_batch")
       .trigger(processingTime="5 minutes")
       .start()
     )
