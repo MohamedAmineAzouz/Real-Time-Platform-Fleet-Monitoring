@@ -62,7 +62,7 @@ def main():
 
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
-    
+
     schema = get_truck_schema()
 
     kafka_df = (

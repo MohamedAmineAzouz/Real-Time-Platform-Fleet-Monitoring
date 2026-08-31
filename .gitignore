@@ -1,4 +1,5 @@
 .env.dev
+.env
 .env.staging
 processing/batch_layer/airflow/logs/*
 processing/batch_layer_2/airflow/logs/*

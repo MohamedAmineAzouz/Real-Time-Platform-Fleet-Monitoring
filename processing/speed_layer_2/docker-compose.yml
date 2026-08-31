@@ -31,7 +31,7 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_MEMORY=3g
       - SPARK_WORKER_CORES=3
     command: >
       /opt/spark/bin/spark-class
@@ -51,7 +51,7 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_MEMORY=3g
       - SPARK_WORKER_CORES=3
     command: >
       /opt/spark/bin/spark-class
@@ -62,7 +62,7 @@ services:
     networks:
       - iot_network
 
-      
+
   spark-worker-3:
     build: .
     container_name: spark-worker-3
@@ -72,7 +72,7 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=4g
+      - SPARK_WORKER_MEMORY=3g
       - SPARK_WORKER_CORES=3
     command: >
       /opt/spark/bin/spark-class
@@ -111,7 +111,7 @@ services:
       bash -c "
       mkdir -p /home/spark/.ivy2/cache /home/spark/.ivy2/jars &&
       pip install minio &&
-      
+
       echo 'Waiting for cluster...' &&
       sleep 30 &&
 

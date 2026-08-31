@@ -41,8 +41,8 @@ SPARK_CONF = {
     "spark.hadoop.fs.s3a.impl":              "org.apache.hadoop.fs.s3a.S3AFileSystem",
 
     "spark.sql.shuffle.partitions": "10",
-    "spark.driver.memory":          "3g",
-    "spark.executor.memory":        "3g",
+    "spark.driver.memory":          "2g",
+    "spark.executor.memory":        "2g",
 
     "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
     "spark.driver.env.CASSANDRA_KEYSPACE":   CASSANDRA_KEYSPACE,

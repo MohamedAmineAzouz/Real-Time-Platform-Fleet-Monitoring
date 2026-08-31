@@ -33,22 +33,22 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_train_pipeline.py"
 SPARK_CONF = {
     "spark.cassandra.connection.host": CASSANDRA_HOST,
     "spark.cassandra.connection.port": CASSANDRA_PORT,
-    
+
     "spark.hadoop.fs.s3a.endpoint": S3_ENDPOINT,
     "spark.hadoop.fs.s3a.access.key": S3_ACCESS_KEY,
     "spark.hadoop.fs.s3a.secret.key": S3_SECRET_KEY,
     "spark.hadoop.fs.s3a.path.style.access": "true",
     "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-    
+
     "spark.sql.shuffle.partitions": "10",
-    "spark.driver.memory": "3g",
-    "spark.executor.memory": "3g",
-    
+    "spark.driver.memory": "2g",
+    "spark.executor.memory": "2g",
+
     "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
     "spark.driver.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
     "spark.executor.env.LAKE_BUCKET": LAKE_BUCKET,
     "spark.executor.env.LAKE_PREFIX": LAKE_PREFIX,
-    
+
     "spark.jars.packages": "com.datastax.spark:spark-cassandra-connector_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4",
 }
 
@@ -67,7 +67,7 @@ SPARK_CONF = {
     tags=["fleet", "maintenance", "training", "ml", "spark"],
 )
 def maintenance_training_dag():
-    
+
     start = EmptyOperator(task_id="training_pipeline_start")
 
     @task

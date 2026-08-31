@@ -334,9 +334,15 @@ export class AppComponent implements OnInit, OnDestroy {
   private initMap(): void {
     const L = (window as any).L;
     this.map = L.map('map', { center: [31.7917, -7.0926], zoom: 6, zoomControl: false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap © CARTO', maxZoom: 19
-    }).addTo(this.map);
+    const cartoApiKey = 'cb1_2fk0_1_9e3e0dfe8d7c7c14b0817ac4';
+    L.tileLayer(
+      `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=${cartoApiKey}`,
+      {
+        attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+      }
+    ).addTo(this.map);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
   }
 
@@ -385,7 +391,7 @@ export class AppComponent implements OnInit, OnDestroy {
             const posChanged =
               updated.latitude  !== this.selectedTruck.latitude ||
               updated.longitude !== this.selectedTruck.longitude;
-            
+
             // Keep the prediction if it was already fetched for this truck
             const currentPrediction = this.selectedTruck.prediction;
             const currentEtaPrediction = this.selectedTruck.etaPrediction;

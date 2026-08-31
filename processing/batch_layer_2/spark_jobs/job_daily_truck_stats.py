@@ -34,11 +34,11 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
     Simplified core logic for daily truck statistics.
     Sum deltas for distance and fuel, and calculate time metrics.
     """
-    
+
     # Window to calculate time deltas between events
     # Including driver_id in partition to handle driver swaps on same truck
     w_truck = Window.partitionBy("truck_id", "driver_id").orderBy("event_time")
-    
+
     # Calculate duration between events in seconds
     with_time_deltas = (
         telemetry_df
@@ -52,7 +52,7 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
         # Cap duration at 10 minutes to avoid spikes from gaps in telemetry
         .withColumn("duration_sec", when(col("duration_sec") > 600, lit(600)).otherwise(col("duration_sec")))
     )
-    
+
     # ── Step 1: Sum Deltas per Truck & Driver ─────────────────────────────
     per_truck_deltas = (
         with_time_deltas
@@ -60,11 +60,11 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
         .agg(
             _round(_sum("fuel_consumed_l"), 2).alias("total_fuel_consumed_l"),
             _round(_sum("distance_km"), 2).alias("total_distance_km"),
-            
+
             # Time Metrics
             _round(_sum(when(col("speed") > 2.0, col("duration_sec")).otherwise(0)) / 3600.0, 2).alias("hours_driven"),
             _round(_sum(when(col("speed") <= 2.0, col("duration_sec")).otherwise(0)) / 3600.0, 2).alias("hours_stopped"),
-            
+
             _round(_max("speed"), 2).alias("max_speed_kmh"),
             _sum(when(col("is_alert") == True, 1).otherwise(0)).alias("total_alerts"),
             _sum(when(col("alert_type") == "OVERSPEED", 1).otherwise(0)).alias("overspeed_count"),
@@ -74,7 +74,7 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
             count("*").alias("event_count")
         )
     )
-    
+
     # ── Step 2: Efficiency Calculation ────────────────────────────────────
     final_stats = (
         per_truck_deltas
@@ -99,24 +99,31 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
         .withColumn("stat_date", lit(run_date))
         .fillna(0.0)
     )
-    
+
     return final_stats
 
 
 def run_job(spark: SparkSession, date_from: str, date_to: str):
     print(f"🚀 Starting Daily Truck Stats Job: {date_from} → {date_to}")
-    
-    # ── 1. Load Data ──────────────────────────────────────────────────────
-    # Load Telemetry from Parquet (S3/MinIO)
+
+    partition_path = f"{S3_PATH}/event_date={date_from}"
+    print(f"📖 Reading telemetry partition from MinIO: {partition_path}")
+
     try:
-        telemetry_df = spark.read.parquet(S3_PATH)
-        # Filter for the requested period
-        telemetry_df = telemetry_df.filter(
-            (to_date(col("event_time")) >= date_from) &
-            (to_date(col("event_time")) <= date_to)
-        )
+        telemetry_df = spark.read.parquet(partition_path)
     except Exception as e:
-        print(f"⚠️ Error reading Parquet from {S3_PATH}: {e}")
+        print(f"⚠️ Could not read direct partition {partition_path}: {e}. Reading entire S3_PATH with basePath...")
+        try:
+            telemetry_df = spark.read.option("basePath", S3_PATH).parquet(S3_PATH).filter(col("event_date") == date_from)
+        except Exception as e2:
+            print(f"❌ Error reading Parquet: {e2}")
+            return
+
+    row_count = telemetry_df.count()
+    print(f"📊 Telemetry DataFrame: {row_count} rows loaded for date {date_from}")
+
+    if row_count == 0:
+        print(f"⚠️ Partition for date {date_from} contains 0 records. Skipping job.")
         return
 
     # Load Truck Registry from Cassandra
@@ -124,21 +131,23 @@ def run_job(spark: SparkSession, date_from: str, date_to: str):
         .format("org.apache.spark.sql.cassandra") \
         .options(table="trucks", keyspace=CASSANDRA_KEYSPACE) \
         .load()
-        
+
     # ── 2. Process ────────────────────────────────────────────────────────
     # Use the date_from as the stat_date for the batch record
     stats_df = compute_daily_stats(telemetry_df, trucks_df, date_from)
-    
+
     # ── 3. Save ───────────────────────────────────────────────────────────
     # REMOVED stats_df.count() to prevent double execution of the aggregation pipeline
     print(f"💾 Committing records to Cassandra: {CASSANDRA_KEYSPACE}.batch_daily_truck_stats")
-    
+
+    print(f"💾 Committing {stats_df.count()} records to Cassandra: {CASSANDRA_KEYSPACE}.batch_daily_truck_stats")
+
     stats_df.write \
         .format("org.apache.spark.sql.cassandra") \
         .mode("append") \
         .options(table="batch_daily_truck_stats", keyspace=CASSANDRA_KEYSPACE) \
         .save()
-        
+
     print("✅ Daily Truck Stats Job Completed Successfully")
 
 
@@ -146,10 +155,10 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: spark-submit job_daily_truck_stats.py <date_from> <date_to>")
         sys.exit(1)
-        
+
     spark = SparkSession.builder \
         .appName("DailyTruckStatsBatch") \
         .getOrCreate()
-        
+
     run_job(spark, sys.argv[1], sys.argv[2])
     spark.stop()

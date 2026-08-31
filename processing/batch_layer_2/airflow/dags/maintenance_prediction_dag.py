@@ -44,7 +44,7 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_maintenance_prediction.py"
     tags=["fleet", "maintenance", "prediction", "spark"],
 )
 def maintenance_prediction_dag():
-    
+
     start = EmptyOperator(task_id="maintenance_prediction_start")
 
     @task
@@ -65,29 +65,29 @@ def maintenance_prediction_dag():
         conn_id=SPARK_CONN_ID,
         deploy_mode="client",
         name="fleet_maintenance_prediction_inference",
-        
+
         conf={
             "spark.cassandra.connection.host": CASSANDRA_HOST,
             "spark.cassandra.connection.port": CASSANDRA_PORT,
-            
+
             "spark.hadoop.fs.s3a.endpoint": S3_ENDPOINT,
             "spark.hadoop.fs.s3a.access.key": S3_ACCESS_KEY,
             "spark.hadoop.fs.s3a.secret.key": S3_SECRET_KEY,
             "spark.hadoop.fs.s3a.path.style.access": "true",
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-            
+
             "spark.sql.shuffle.partitions": "10",
-            "spark.driver.memory": "3g",
-            "spark.executor.memory": "3g",
-            
+            "spark.driver.memory": "2g",
+            "spark.executor.memory": "2g",
+
             "spark.executor.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
             "spark.driver.env.CASSANDRA_KEYSPACE": CASSANDRA_KEYSPACE,
             "spark.executor.env.LAKE_BUCKET": LAKE_BUCKET,
             "spark.executor.env.LAKE_PREFIX": LAKE_PREFIX,
-            
+
             "spark.jars.packages": "com.datastax.spark:spark-cassandra-connector_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4",
         },
-        
+
         application_args=[
             "{{ ti.xcom_pull(task_ids='get_prediction_dates')['date_from'] }}",
             "{{ ti.xcom_pull(task_ids='get_prediction_dates')['date_to'] }}",
