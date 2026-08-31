@@ -122,10 +122,72 @@ def get_daily_truck_stats_context() -> str:
     except Exception as e:
         return f"Error retrieving daily truck stats: {e}"
 
+def get_drivers_context() -> str:
+    """Fetch and format drivers registry as markdown."""
+    try:
+        df = query_df("SELECT * FROM drivers")
+        if df.empty:
+            return "No driver registry data available."
+        cols = ['driver_id', 'name', 'license_number', 'phone', 'status', 'current_truck_id']
+        available_cols = [c for c in cols if c in df.columns]
+        df_subset = df[available_cols].copy().head(20)
+        return _format_df_markdown(df_subset)
+    except Exception as e:
+        return f"Error retrieving drivers: {e}"
+
+def get_trucks_context() -> str:
+    """Fetch and format trucks registry as markdown."""
+    try:
+        df = query_df("SELECT * FROM trucks")
+        if df.empty:
+            return "No truck registry data available."
+        cols = ['truck_id', 'license_plate', 'model', 'year', 'status', 'fuel_capacity', 'max_load_kg']
+        available_cols = [c for c in cols if c in df.columns]
+        df_subset = df[available_cols].copy().head(20)
+        return _format_df_markdown(df_subset)
+    except Exception as e:
+        return f"Error retrieving trucks: {e}"
+
+def get_trajets_context() -> str:
+    """Fetch and format standard trajets (routes) as markdown."""
+    try:
+        df = query_df("SELECT * FROM trajets")
+        if df.empty:
+            return "No trajets route data available."
+        cols = ['start_city', 'end_city', 'distance_km']
+        available_cols = [c for c in cols if c in df.columns]
+        df_subset = df[available_cols].copy().head(20)
+        return _format_df_markdown(df_subset)
+    except Exception as e:
+        return f"Error retrieving trajets: {e}"
+
+def get_driver_performance_context() -> str:
+    """Fetch and format batch driver performance rankings as markdown."""
+    try:
+        df = query_df("SELECT * FROM batch_driver_performance")
+        if df.empty:
+            return "No driver performance rankings available."
+        cols = [
+            'stat_date', 'driver_id', 'fleet_rank', 'performance_score',
+            'speed_compliance_rate', 'fuel_per_100km', 'alert_rate_per_100',
+            'theft_events', 'total_distance_km'
+        ]
+        available_cols = [c for c in cols if c in df.columns]
+        df_subset = df[available_cols].copy()
+        if 'stat_date' in df_subset.columns:
+            df_subset = df_subset.sort_values(['stat_date', 'fleet_rank'], ascending=[False, True]).head(15)
+        return _format_df_markdown(df_subset)
+    except Exception as e:
+        return f"Error retrieving driver performance: {e}"
+
 def retrieve_all_context() -> str:
-    """Retrieve and combine all contexts into one large prompt context string."""
+    """Retrieve and combine all contexts into one comprehensive prompt context string."""
     context_blocks = []
     
+    context_blocks.append("### DRIVER REGISTRY (ID, NAME, CURRENT TRUCK)\n" + get_drivers_context())
+    context_blocks.append("### FLEET VEHICLES REGISTRY (TRUCKS, MODELS, SPECS)\n" + get_trucks_context())
+    context_blocks.append("### STANDARD CORRIDORS & TRAJETS\n" + get_trajets_context())
+    context_blocks.append("### BATCH DRIVER PERFORMANCE & RANKINGS\n" + get_driver_performance_context())
     context_blocks.append("### WEEKLY SUMMARY PERFORMANCE METRICS\n" + get_weekly_summary_context())
     context_blocks.append("### ROUTE/CORRIDOR OPERATIONAL EFFICIENCY\n" + get_route_efficiency_context())
     context_blocks.append("### DAILY TRUCK STATISTICS (TOP ALERT/VOLUME VEHICLES)\n" + get_daily_truck_stats_context())

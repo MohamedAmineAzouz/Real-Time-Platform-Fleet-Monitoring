@@ -9,6 +9,7 @@ import os
 from utils.cassandra_client import query_df
 from utils.styles import get_css, THEMES, hex_to_rgba
 from utils.rag_retriever import retrieve_all_context
+from utils import vpn_client
 
 # ── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -198,14 +199,46 @@ if not summary_df.empty:
     # `position: fixed` on it is reliable.
     if "fp_chat_open" not in st.session_state:
         st.session_state.fp_chat_open = False
+    if "fp_chat_fullscreen" not in st.session_state:
+        st.session_state.fp_chat_fullscreen = False
+    if "fp_font_size" not in st.session_state:
+        st.session_state.fp_font_size = 0.85
     if "fp_pending" not in st.session_state:
         st.session_state.fp_pending = False
     if "fp_pending_prompt" not in st.session_state:
         st.session_state.fp_pending_prompt = None
 
-    st.markdown("""
+    font_rem = f"{st.session_state.fp_font_size}rem"
+    is_fs = st.session_state.fp_chat_fullscreen
+
+    # Dynamic panel dimensions
+    panel_css = """
+        position: fixed !important;
+        top: 30px !important;
+        bottom: 30px !important;
+        left: 5vw !important;
+        right: 5vw !important;
+        width: 90vw !important;
+        max-width: 90vw !important;
+        height: auto !important;
+        max-height: calc(100vh - 60px) !important;
+        border-radius: 20px !important;
+    """ if is_fs else """
+        position: fixed !important;
+        bottom: 86px !important;
+        right: 24px !important;
+        width: 440px !important;
+        max-width: 92vw !important;
+        height: 560px !important;
+        max-height: 80vh !important;
+        border-radius: 16px !important;
+    """
+
+    msg_height_css = "calc(100vh - 220px)" if is_fs else "390px"
+
+    st.markdown(f"""
     <style>
-    :root {
+    :root {{
         --fp-bg: #0f172a;
         --fp-surface: #131c2e;
         --fp-border: rgba(255,255,255,0.08);
@@ -213,18 +246,18 @@ if not summary_df.empty:
         --fp-text-muted: #94a3b8;
         --fp-accent: #2563EB;
         --fp-ai-bubble: #1e293b;
-    }
+    }}
 
     /* ── Floating trigger button ── */
-    .st-key-fp_toggle_btn {
+    .st-key-fp_toggle_btn {{
         position: fixed !important;
         bottom: 24px !important;
         right: 24px !important;
         z-index: 999999 !important;
         width: 52px !important;
         height: 52px !important;
-    }
-    .st-key-fp_toggle_btn button {
+    }}
+    .st-key-fp_toggle_btn button {{
         width: 52px !important;
         height: 52px !important;
         min-width: 52px !important;
@@ -241,139 +274,143 @@ if not summary_df.empty:
         line-height: 1 !important;
         box-shadow: 0 8px 22px rgba(37, 99, 235, 0.45) !important;
         transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-    }
-    .st-key-fp_toggle_btn button:hover {
+    }}
+    .st-key-fp_toggle_btn button:hover {{
         transform: scale(1.07) !important;
         box-shadow: 0 10px 28px rgba(37, 99, 235, 0.6) !important;
-    }
+    }}
 
     /* ── Modal panel ── */
-    .st-key-fp_panel {
-        position: fixed !important;
-        bottom: 86px !important;
-        right: 24px !important;
-        width: 400px !important;
-        max-width: 92vw !important;
-        height: 540px !important;
-        max-height: 80vh !important;
+    .st-key-fp_panel {{
+        {panel_css}
         background: var(--fp-bg) !important;
         border: 1px solid var(--fp-border) !important;
-        border-radius: 16px !important;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
-        padding: 14px !important;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75) !important;
+        padding: 16px !important;
         overflow: hidden !important;
         z-index: 999998 !important;
-        font-size: 0.85rem !important;
+        font-size: {font_rem} !important;
         animation: fpSlideUp 0.2s ease-out !important;
-        justify-content: space-around !important;
-    }
-    @keyframes fpSlideUp {
-        from { opacity: 0; transform: translateY(14px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
+        display: flex !important;
+        flex-direction: column !important;
+    }}
+    @keyframes fpSlideUp {{
+        from {{ opacity: 0; transform: translateY(14px); }}
+        to   {{ opacity: 1; transform: translateY(0); }}
+    }}
 
     /* Header row */
-    .st-key-fp_header { margin-bottom: 8px !important; }
-    .fp-header-left { display: flex; align-items: center; gap: 10px; }
-    .fp-avatar {
+    .st-key-fp_header {{
+        margin-bottom: 8px !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid var(--fp-border) !important;
+    }}
+    .fp-header-left {{ display: flex; align-items: center; gap: 10px; }}
+    .fp-avatar {{
         width: 34px; height: 34px; border-radius: 50%;
         background: linear-gradient(135deg, #2563EB, #4f46e5);
         display: flex; align-items: center; justify-content: center; font-size: 1rem;
         flex-shrink: 0;
-    }
-    .fp-title { font-weight: 700; font-size: 0.95rem; color: #f8fafc; line-height: 1.25; }
-    .fp-status { font-size: 0.7rem; color: #10b981; margin-top: 2px; }
+    }}
+    .fp-title {{ font-weight: 700; font-size: 0.95rem; color: #f8fafc; line-height: 1.25; }}
+    .fp-status {{ font-size: 0.7rem; color: #10b981; margin-top: 2px; }}
 
-    .st-key-fp_close_btn button {
-        background: transparent !important;
-        border: none !important;
-        color: var(--fp-text-muted) !important;
-        font-size: 0.95rem !important;
-        padding: 2px 8px !important;
+    /* Header tool buttons */
+    .st-key-fp_header button {{
+        background: rgba(255,255,255,0.06) !important;
+        border: 1px solid var(--fp-border) !important;
+        color: var(--fp-text) !important;
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        padding: 2px 4px !important;
+        border-radius: 8px !important;
         min-height: unset !important;
-        height: auto !important;
+        height: 28px !important;
+        width: 100% !important;
         box-shadow: none !important;
-    }
-    .st-key-fp_close_btn button:hover { color: #f8fafc !important; }
+        transition: all 0.15s ease !important;
+    }}
+    .st-key-fp_header button:hover {{
+        background: rgba(37, 99, 235, 0.35) !important;
+        border-color: #2563EB !important;
+        color: #ffffff !important;
+    }}
 
     /* ── Scrollable message container ── */
-    .st-key-fp_messages {
-        height: 380px !important;
+    .st-key-fp_messages {{
+        height: {msg_height_css} !important;
         overflow-y: auto !important;
-        padding-right: 4px !important;
-    }
+        padding-right: 6px !important;
+        flex: 1 1 auto !important;
+    }}
 
     /* Clean, non-overlapping message bubbles */
-    .st-key-fp_messages div[data-testid="stChatMessage"] {
-        padding: 10px 10px 20px 5px !important;
+    .st-key-fp_messages div[data-testid="stChatMessage"] {{
+        padding: 12px 14px !important;
         border-radius: 12px !important;
-        margin-bottom: 10px !important;
+        margin-bottom: 12px !important;
         width: 100% !important;
         box-sizing: border-box !important;
         background: var(--fp-surface) !important;
         border: 1px solid var(--fp-border) !important;
-    }
+    }}
 
     /* User Message Bubble */
-    .st-key-fp_messages div[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
-        background: rgba(37, 99, 235, 0.2) !important;
+    .st-key-fp_messages div[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {{
+        background: rgba(37, 99, 235, 0.18) !important;
         border-color: rgba(37, 99, 235, 0.4) !important;
-    }
+    }}
 
     /* Assistant Message Bubble */
-    .st-key-fp_messages div[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
-        background: rgba(30, 41, 59, 0.8) !important;
+    .st-key-fp_messages div[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {{
+        background: rgba(30, 41, 59, 0.85) !important;
         border-color: rgba(255, 255, 255, 0.08) !important;
-    }
+    }}
 
-    .st-key-fp_messages div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
-        font-size: 0.83rem !important;
-        line-height: 1.45 !important;
-        font-weight: 400 !important;
-        margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
+    .st-key-fp_messages div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p,
+    .st-key-fp_messages div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] li,
+    .st-key-fp_messages div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] td,
+    .st-key-fp_messages div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] th {{
+        font-size: {font_rem} !important;
+        line-height: 1.5 !important;
         color: var(--fp-text) !important;
-    }
+    }}
 
     /* Typing indicator */
-    .fp-typing { display: flex; align-items: center; gap: 4px; padding: 6px 0; }
-    .fp-typing span {
+    .fp-typing {{ display: flex; align-items: center; gap: 4px; padding: 6px 0; }}
+    .fp-typing span {{
         width: 6px; height: 6px; border-radius: 50%;
         background: var(--fp-text-muted);
         animation: fpBounce 1.2s infinite ease-in-out;
-    }
-    .fp-typing span:nth-child(2) { animation-delay: 0.15s; }
-    .fp-typing span:nth-child(3) { animation-delay: 0.3s; }
-    @keyframes fpBounce {
-        0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-        30% { transform: translateY(-4px); opacity: 1; }
-    }
+    }}
+    .fp-typing span:nth-child(2) {{ animation-delay: 0.15s; }}
+    .fp-typing span:nth-child(3) {{ animation-delay: 0.3s; }}
+    @keyframes fpBounce {{
+        0%, 60%, 100% {{ transform: translateY(0); opacity: 0.5; }}
+        30% {{ transform: translateY(-4px); opacity: 1; }}
+    }}
 
     /* Input area */
-    .st-key-fp_panel div[data-testid="stChatInput"] {
+    .st-key-fp_panel div[data-testid="stChatInput"] {{
         margin-top: 8px !important;
         width: 100% !important;
         box-sizing: border-box !important;
-    }
+    }}
     .st-key-fp_panel div[data-testid="stChatInput"] textarea,
-    .st-key-fp_panel div[data-testid="stChatInput"] input {
+    .st-key-fp_panel div[data-testid="stChatInput"] input {{
         width: 100% !important;
         box-sizing: border-box !important;
-        font-size: 0.83rem !important;
+        font-size: {font_rem} !important;
         border-radius: 14px !important;
         background: #171c28 !important;
         border: 1px solid var(--fp-border) !important;
         color: var(--fp-text) !important;
         padding: 8px 12px !important;
-        padding-left: 1.3rem;
-        margin-left: -5%;
-
-    }
-    .st-key-fp_panel div[data-testid="stChatInput"] button {
+    }}
+    .st-key-fp_panel div[data-testid="stChatInput"] button {{
         background: var(--fp-accent) !important;
         border-radius: 50% !important;
-    }
-    </style>
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -384,9 +421,9 @@ if not summary_df.empty:
 
     if st.session_state.fp_chat_open:
         with st.container(key="fp_panel"):
-            # Header
+            # Header with Controls (Zoom In, Zoom Out, Fullscreen, Close)
             with st.container(key="fp_header"):
-                hcol1, hcol2 = st.columns([5, 1])
+                hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns([6, 1.2, 1.2, 1.2, 1.2])
                 with hcol1:
                     st.markdown("""
                         <div class="fp-header-left">
@@ -398,20 +435,35 @@ if not summary_df.empty:
                         </div>
                     """, unsafe_allow_html=True)
                 with hcol2:
-                    if st.button("✕", key="fp_close_btn"):
-                        st.session_state.fp_chat_open = False
-                        st.rerun()
+                    with st.container(key="fp_btn_zoom_out"):
+                        if st.button("A-", key="fp_zoom_out_btn", help="Decrease text size"):
+                            st.session_state.fp_font_size = max(0.65, round(st.session_state.fp_font_size - 0.08, 2))
+                            st.rerun()
+                with hcol3:
+                    with st.container(key="fp_btn_zoom_in"):
+                        if st.button("A+", key="fp_zoom_in_btn", help="Increase text size"):
+                            st.session_state.fp_font_size = min(1.30, round(st.session_state.fp_font_size + 0.08, 2))
+                            st.rerun()
+                with hcol4:
+                    with st.container(key="fp_btn_fs"):
+                        fs_icon = "🗗" if st.session_state.fp_chat_fullscreen else "⛶"
+                        fs_help = "Exit Fullscreen" if st.session_state.fp_chat_fullscreen else "Expand to Fullscreen"
+                        if st.button(fs_icon, key="fp_fullscreen_btn", help=fs_help):
+                            st.session_state.fp_chat_fullscreen = not st.session_state.fp_chat_fullscreen
+                            st.rerun()
+                with hcol5:
+                    with st.container(key="fp_btn_close"):
+                        if st.button("✕", key="fp_close_btn", help="Close Chat"):
+                            st.session_state.fp_chat_open = False
+                            st.rerun()
 
             if "chat_messages" not in st.session_state:
                 st.session_state.chat_messages = [
                     {"role": "assistant", "content": "Hello! I'm your FleetPulse AI assistant. Ask me anything about fleet metrics, fuel anomalies, or maintenance priorities!"}
                 ]
 
-            # Scrollable message area. When a reply is pending, an animated
-            # "typing" bubble renders here immediately (this Streamlit run
-            # streams it to the browser right away), and a second rerun
-            # swaps it out for the real answer once it's ready.
-            with st.container(key="fp_messages", height=300):
+            # Scrollable message area
+            with st.container(key="fp_messages"):
                 for msg in st.session_state.chat_messages:
                     with st.chat_message(msg["role"]):
                         st.markdown(msg["content"])
@@ -439,33 +491,52 @@ if not summary_df.empty:
             if st.session_state.fp_pending:
                 pending_prompt = st.session_state.fp_pending_prompt
 
-                SYSTEM_PROMPT = """You are FleetPulse Executive AI, a professional GenAI Strategic Fleet Analyst.
-You are helping executives analyze the performance, efficiency, safety, and maintenance of their truck fleet in Morocco.
+                SYSTEM_PROMPT = """You are FleetPulse AI, an executive AI analyst for a truck fleet monitoring platform in Morocco.
 
-You have access to the latest batch analytics summaries from the Cassandra data warehouse:
+You have direct access to recent batch analytics from Cassandra:
 {context}
 
-Guidelines:
-1. Provide highly professional, structured, and quantitative answers. Focus on concrete data points: mention specific weeks, corridors (e.g. Martil ➔ Settat), average speeds, alerts, fuel consumed (L), and truck IDs where relevant.
-2. If the user asks about a specific corridor like 'Martil ➔ Settat', look at 'ROUTE/CORRIDOR OPERATIONAL EFFICIENCY' and identify any abnormal fuel consumption or high average fuel/100km.
-3. Cross-reference with 'DAILY TRUCK STATISTICS' or 'FUEL WASTE AND ANOMALOUS CONSUMPTION' to find specific trucks (e.g. ID 10, 15, 22) that caused the variance due to overspeed alerts or fuel anomalies on those routes.
-4. If you mention external factors like "heavy storm conditions" or "traffic delays", state them as reasonable hypotheses based on speed/alert data, and clearly ground them in the database stats.
-5. If the database does not contain information to answer the question, state that the metrics are not available in the current batch rollup, but propose what to monitor.
-6. Keep your answers concise, clear, and action-oriented for executives.
+Core Guidelines:
+1. Intent & Tone: Be direct, professional, articulate, and concise.
+2. Greetings: If the user simply greets you (e.g., "hello", "hi"), respond politely with a short 1-2 sentence greeting and offer your assistance without dumping a full fleet report.
+3. Answering Fleet Questions:
+   - Answer the question directly in the very first sentence.
+   - Correlate driver names with their assigned trucks (using DRIVER REGISTRY / BATCH DRIVER PERFORMANCE) when asked about drivers.
+   - Use concrete numbers, driver names, vehicle IDs, routes (e.g., Rabat ➔ Taza), and dates.
+   - Use clean, structured Markdown (bullet points, bold key stats, compact tables).
+   - Only bring up relevant warnings/anomalies if they relate to the user's question or are critical context.
+4. Data Grounding: Base answers strictly on the provided context data. If data is not available, state that clearly and suggest what to monitor.
+5. Avoid Fluff: Do not repeat long introductory boilerplate or overwhelm the user with unsolicited metrics.
 """
 
-                ollama_url = st.session_state.get("ollama_url", "http://ollama:11434")
-                ollama_model = st.session_state.get("ollama_model", "llama3.2")
+                # Determine Ollama endpoint based on environment
+                remote_host = os.getenv("REMOTE_OLLAMA_HOST")
+                print(remote_host)
+                print('----------------------------------------------------------------------------\n')
+
+                if remote_host:
+                    # Ensure VPN connection before using remote host
+                    if not vpn_client.ensure_vpn_connected():
+                        st.error("Failed to establish VPN connection for remote Ollama.")
+                        raise RuntimeError("VPN connection failed")
+                    ollama_url = f"http://{remote_host}:11434"
+                    ollama_model = "qwen2.5:14b"
+                else:
+                    ollama_url = st.session_state.get("ollama_url", "http://ollama:11434")
+                    ollama_model = st.session_state.get("ollama_model", "llama3.2")
 
                 try:
                     try:
                         from langchain_ollama import ChatOllama
                     except ImportError:
                         from langchain_community.chat_models import ChatOllama
-                    from langchain.schema import SystemMessage, HumanMessage
+                    from langchain.schema import SystemMessage, HumanMessage, AIMessage
 
                     context_data = retrieve_all_context()
                     system_instructions = SYSTEM_PROMPT.format(context=context_data)
+
+                    print(ollama_model, ollama_url)
+                    print('----------------------------------------------------------------------------\n')
 
                     llm = ChatOllama(
                         base_url=ollama_url,
@@ -478,7 +549,9 @@ Guidelines:
                         if old_msg["role"] == "user":
                             messages_for_llm.append(HumanMessage(content=old_msg["content"]))
                         elif old_msg["role"] == "assistant":
-                            messages_for_llm.append(HumanMessage(content=old_msg["content"]))
+                            messages_for_llm.append(AIMessage(content=old_msg["content"]))
+                    print(messages_for_llm)
+                    print('----------------------------------------------------------------------------\n')
 
                     response_text = ""
                     for chunk in llm.stream(messages_for_llm):
