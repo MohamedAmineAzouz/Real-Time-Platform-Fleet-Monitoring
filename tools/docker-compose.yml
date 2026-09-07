@@ -149,6 +149,9 @@ services:
       CASSANDRA_USER:     ${CASSANDRA_USER:-cassandra}
       CASSANDRA_PASSWORD: ${CASSANDRA_PASSWORD:-cassandra}
       NUM_TRUCKS:         ${NUM_TRUCKS:-10}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     command: ["python", "-c", "from truck_simulator.services.validator import validate_and_seed; validate_and_seed()"]
     networks:
       - iot_network

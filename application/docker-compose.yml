@@ -17,6 +17,9 @@ services:
       CASSANDRA_PORT:     ${CASSANDRA_PORT:-9042}
       CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-fleet}
       NUM_TRUCKS: ${NUM_TRUCKS:-10}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - iot_network
     restart: on-failure
