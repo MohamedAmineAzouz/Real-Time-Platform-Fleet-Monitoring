@@ -1,10 +1,16 @@
-"""NetBird VPN client manager for Streamlit container."""
+"""NetBird VPN client manager for Streamlit container with auto-disconnect idle timer."""
 
 import os
 import subprocess
 import time
+import threading
 from typing import Tuple
 import streamlit as st
+
+IDLE_TIMEOUT_SECONDS = 300  # 5 minutes (300 seconds)
+_last_activity_time = 0.0
+_watchdog_thread = None
+_lock = threading.Lock()
 
 
 def _run_cmd(cmd: list[str]) -> Tuple[bool, str]:
@@ -32,6 +38,31 @@ def is_connected() -> bool:
     return "connected" in out.lower()
 
 
+def record_activity():
+    """Update last activity timestamp and start watchdog timer if not running."""
+    global _last_activity_time, _watchdog_thread
+    with _lock:
+        _last_activity_time = time.time()
+        if _watchdog_thread is None or not _watchdog_thread.is_alive():
+            _watchdog_thread = threading.Thread(target=_idle_watchdog, daemon=True)
+            _watchdog_thread.start()
+
+
+def _idle_watchdog():
+    """Background daemon thread checking for 5 minutes of inactivity to disconnect VPN."""
+    global _last_activity_time
+    while True:
+        time.sleep(15)
+        with _lock:
+            if not is_connected():
+                break
+            elapsed = time.time() - _last_activity_time
+            if elapsed >= IDLE_TIMEOUT_SECONDS:
+                print(f"⏱️ NetBird VPN idle for {elapsed:.0f}s (>= {IDLE_TIMEOUT_SECONDS}s). Disconnecting automatically...")
+                disconnect_vpn()
+                break
+
+
 def ensure_vpn_connected(timeout: int = 30) -> bool:
     """Ensure that the NetBird VPN is up and connected.
 
@@ -39,10 +70,12 @@ def ensure_vpn_connected(timeout: int = 30) -> bool:
     Caches connection status in st.session_state.
     """
     if st.session_state.get("vpn_connected") and is_connected():
+        record_activity()
         return True
 
     if is_connected():
         st.session_state.vpn_connected = True
+        record_activity()
         return True
 
     setup_key = os.getenv("NETBIRD_SETUP_KEY")
@@ -72,6 +105,7 @@ def ensure_vpn_connected(timeout: int = 30) -> bool:
         while time.time() - start_time < timeout:
             if is_connected():
                 st.session_state.vpn_connected = True
+                record_activity()
                 st.sidebar.success("🟢 NetBird VPN Connected")
                 return True
             time.sleep(1)
@@ -84,5 +118,9 @@ def ensure_vpn_connected(timeout: int = 30) -> bool:
 def disconnect_vpn() -> Tuple[bool, str]:
     """Disconnect NetBird VPN session."""
     ok, out = _run_cmd(["netbird", "down"])
-    st.session_state.vpn_connected = False
+    try:
+        if "vpn_connected" in st.session_state:
+            st.session_state.vpn_connected = False
+    except Exception:
+        pass
     return ok, out

@@ -558,6 +558,7 @@ Core Guidelines:
                         response_text += chunk.content
 
                     st.session_state.chat_messages.append({"role": "assistant", "content": response_text})
+                    vpn_client.record_activity()
                 except Exception as e:
                     response_text = f"⚠️ **LLM Error:** Could not connect to Ollama. Please make sure the Ollama service is running.\n\n`{e}`"
                     st.session_state.chat_messages.append({"role": "assistant", "content": response_text})
