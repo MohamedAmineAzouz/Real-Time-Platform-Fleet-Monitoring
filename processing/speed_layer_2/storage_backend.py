@@ -26,6 +26,11 @@ def configure_storage(builder):
             .config("spark.hadoop.fs.s3a.secret.key", MINIO_ROOT_PASSWORD)
             .config("spark.hadoop.fs.s3a.path.style.access", "true")
             .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            .config("spark.hadoop.fs.s3a.fast.upload", "true")
+            .config("spark.hadoop.fs.s3a.fast.upload.buffer", "bytebuffer")
+            .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
+            .config("spark.hadoop.fs.s3a.committer.name", "directory")
+            .config("spark.hadoop.fs.s3a.committer.staging.conflict-mode", "append")
         )
 
     elif STORAGE_BACKEND == "gcs":
