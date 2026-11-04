@@ -1,11 +1,5 @@
 version: "3.9"
 
-# ── IoT Simulation Layer ──────────────────────────────────────────────────────
-# Simulator + Backend API + Frontend
-# Requires streaming layer running first.
-# Start: docker compose -f docker-compose.yml up -d
-# ─────────────────────────────────────────────────────────────────────────────
-
 services:
 
   simulator:

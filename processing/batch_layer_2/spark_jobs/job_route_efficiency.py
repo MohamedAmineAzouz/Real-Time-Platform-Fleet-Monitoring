@@ -1,10 +1,3 @@
-"""
-spark_jobs/job_route_efficiency.py
-─────────────────────────────────────────────────────────────────────────────
-Route Efficiency Analysis: Aggregating performance by Start -> End city pairs.
-─────────────────────────────────────────────────────────────────────────────
-"""
-
 import os
 import sys
 from pyspark.sql import SparkSession, DataFrame, Window

@@ -1,10 +1,3 @@
-"""
-models/truck.py
-─────────────────────────────────────────────────────────────────────────────
-Pydantic response models — one per Cassandra table.
-All fields Optional so partial rows don't crash the API.
-─────────────────────────────────────────────────────────────────────────────
-"""
 
 from typing import Optional
 from datetime import datetime
@@ -102,4 +95,4 @@ class ETAPrediction(BaseModel):
     avg_speed_kmh:        float
     distance_km:          float
     confidence:           str
-    sample_count:         int
+    sample_count:         int

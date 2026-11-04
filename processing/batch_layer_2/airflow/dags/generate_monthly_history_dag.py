@@ -1,10 +1,4 @@
-"""
-dags/generate_monthly_history_dag.py
-─────────────────────────────────────────────────────────────────────────────
-DAG to populate `fleet.truck_history` with realistic data for March 2026.
-Airflow 3 Compatible.
-─────────────────────────────────────────────────────────────────────────────
-"""
+
 
 import random, os
 from datetime import datetime, timedelta
@@ -18,18 +12,15 @@ CASSANDRA_KEYSPACE = os.getenv("CASSANDRA_KEYSPACE", "fleet")
 CASSANDRA_USER     = os.getenv("CASSANDRA_USER",     "")
 CASSANDRA_PASS     = os.getenv("CASSANDRA_PASS",     "")
 
-# Data pools
 CITIES = ["Casablanca", "Rabat", "Marrakech", "Tanger", "Agadir", "Fes", "Oujda", "Meknes"]
 DRIVERS = ["DRV-0001", "DRV-0002", "DRV-0003", "DRV-0004", "DRV-0005"]
 
-# Date Range for March 2026
 START_DATE = datetime(2026, 4, 1)
 END_DATE = datetime(2026, 5, 1)
 
 
 @task
 def generate_monthly_history():
-    """Connect to Cassandra and insert realistic truck history for March."""
     from cassandra.cluster import Cluster
     from cassandra.auth import PlainTextAuthProvider
 
@@ -47,7 +38,6 @@ def generate_monthly_history():
     session = cluster.connect()
     session.set_keyspace(CASSANDRA_KEYSPACE)
 
-    # Prepare statement for speed
     insert_stmt = session.prepare("""
         INSERT INTO truck_history (
             truck_id, processed_at, event_time, latitude, longitude, speed,
@@ -64,7 +54,6 @@ def generate_monthly_history():
 
     while current_date < END_DATE:
         for truck_id in range(1, 11):
-            # ── Logic: Truck 4 in Maintenance for first week ──
             if truck_id == 4 and 1 <= current_date.day <= 7:
                 ts = current_date.replace(hour=10, minute=0)
                 session.execute(insert_stmt, (
@@ -73,16 +62,11 @@ def generate_monthly_history():
                 ))
                 rows_inserted += 1
             else:
-                # ── Logic: Normal Driving ──
-                # Generate 2 records per day per truck (Morning & Afternoon)
                 for hour in [9, 15]:
                     ts = current_date.replace(hour=hour, minute=random.randint(0, 59))
-
-                    # Speed logic
                     speed = random.uniform(60, 110)
                     in_maint = False
 
-                    # Truck 2 speeds occasionally
                     if truck_id == 2 and random.random() < 0.3:
                         speed = random.uniform(125, 150)
 
@@ -105,7 +89,7 @@ def generate_monthly_history():
     dag_id="generate_monthly_history",
     description="One-time DAG to seed March 2026 data into truck_history",
     start_date=datetime(2026, 3, 1),
-    schedule=None,  # Manual trigger only
+    schedule=None,
     catchup=False,
     tags=["fleet", "maintenance", "seed"],
 )

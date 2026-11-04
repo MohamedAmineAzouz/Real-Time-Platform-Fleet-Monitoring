@@ -1,13 +1,3 @@
-"""
-validator.py
-─────────────────────────────────────────────────────────────────────────────
-Validates Cassandra data before starting simulation.
-- Checks if tables have data
-- Ensures truck count matches NUM_TRUCKS
-- Generates seed data if needed
-─────────────────────────────────────────────────────────────────────────────
-"""
-
 import os
 import sys
 import time

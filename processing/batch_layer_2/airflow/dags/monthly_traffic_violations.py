@@ -1,10 +1,3 @@
-"""
-dags/monthly_traffic_violations_dag.py
-─────────────────────────────────────────────────────────────────────────────
-Airflow DAG: Monthly Traffic Violations (Airflow 3.2 + Env-Only Config)
-─────────────────────────────────────────────────────────────────────────────
-"""
-
 import os
 from datetime import datetime, timedelta
 from airflow.sdk import dag, task
@@ -34,13 +27,11 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_traffic_violations.py"
     tags=["fleet", "batch", "violations", "spark", "cassandra"],
 )
 def monthly_traffic_violations_dag():
-    """DAG definition - NO return statement in Airflow 3.2"""
 
     start = EmptyOperator(task_id="violations_start")
 
     @task
     def calc_dates(**context):
-        """Calculate previous month date range using logical_date (Airflow 3.x)"""
         logical_date = context["logical_date"]
         first_current = logical_date.replace(day=1)
         prev_month = (first_current - timedelta(days=1)).replace(day=1)

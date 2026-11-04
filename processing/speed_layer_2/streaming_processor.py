@@ -58,7 +58,6 @@ def write_to_minio_lake(batch_df, batch_id):
 
 def main():
     ensure_bucket_exists()
-    # LAKE_PATH = get_storage_uri()
 
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")

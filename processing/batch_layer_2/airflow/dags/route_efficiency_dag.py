@@ -1,13 +1,4 @@
-"""
-dags/route_efficiency_dag.py
-─────────────────────────────────────────────────────────────────────────────
-Airflow DAG: Route Efficiency Analysis
-─────────────────────────────────────────────────────────────────────────────
-- Schedule: Daily at 04:00 (After predictive maintenance)
-- Logic: Aggregates performance by Start City -> End City.
-- Output: Cassandra table `batch_route_efficiency`
-─────────────────────────────────────────────────────────────────────────────
-"""
+
 
 import os
 from datetime import datetime, timedelta
@@ -50,7 +41,6 @@ def route_efficiency_dag():
     @task
     def get_analysis_dates(**context):
         logical_date = context.get("logical_date") or context.get("execution_date")
-        # Process the full day that just ended
         target_date = logical_date - timedelta(days=1)
         return {
             "date_from": target_date.strftime("%Y-%m-%d"),

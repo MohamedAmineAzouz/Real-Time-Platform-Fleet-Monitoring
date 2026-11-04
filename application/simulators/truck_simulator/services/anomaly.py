@@ -1,6 +1,5 @@
 import random
 
-# ── Fuel-theft event (still random, independent) ──────────────────────────────
 THEFT_CHANCE       = 0.0003
 THEFT_AMOUNT_RANGE = (0.8, 2.5)
 
@@ -25,7 +24,6 @@ def inject_anomaly(data: dict, truck) -> dict:
         data["fuel_level"]  = truck.fuel_level
         data["theft_amount"] = stolen
         theft_event = True
-        # ← theft is NOT consumption, track it separately
         data["fuel_stolen_pct"] = stolen
     else:
         data["fuel_stolen_pct"] = 0.0

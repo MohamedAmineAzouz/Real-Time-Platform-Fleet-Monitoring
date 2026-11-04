@@ -43,14 +43,8 @@ def weekly_summary_dag():
 
     @task
     def get_summary_end_date(**context):
-        """
-        The job runs on Monday. We want to process the week ending on the previous Sunday.
-        """
         logical_date = context.get("logical_date") or context.get("execution_date")
         
-        # If run on Monday, logical_date might be Monday. 
-        # We want the stats up to Sunday.
-        # target = logical_date - timedelta(days=1)
         target = logical_date
         
         return target.strftime("%Y-%m-%d")

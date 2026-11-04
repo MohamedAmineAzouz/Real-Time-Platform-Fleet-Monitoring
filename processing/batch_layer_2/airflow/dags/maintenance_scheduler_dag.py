@@ -1,16 +1,4 @@
-"""
-dags/maintenance_scheduler_dag.py
-─────────────────────────────────────────────────────────────────────────────
-Maintenance Schedule Generator — Airflow DAG
-─────────────────────────────────────────────────────────────────────────────
-Runs on the 30th of each month at 02:00.
-Generates maintenance schedules for the NEXT month.
 
-Example:
-  - DAG runs on April 30 → Generates schedules for May
-  - DAG runs on May 30   → Generates schedules for June
-─────────────────────────────────────────────────────────────────────────────
-"""
 
 from __future__ import annotations
 
@@ -72,7 +60,6 @@ DESCRIPTIONS = {
 
 
 def _connect_cassandra():
-    """Connect to Cassandra and return session + cluster."""
     from cassandra.cluster import Cluster
     from cassandra.auth import PlainTextAuthProvider
 
@@ -90,13 +77,11 @@ def _connect_cassandra():
 
 
 def _get_truck_ids(session):
-    """Get all truck IDs from the trucks table."""
     result = session.execute("SELECT truck_id FROM trucks")
     return [row.truck_id for row in result]
 
 
 def _random_time(month_start, day=None):
-    """Generate a random datetime within working hours."""
     if day is None:
         day = random.randint(1, 28)
     hour   = random.randint(WORK_START_HOUR, WORK_END_HOUR - 1)
@@ -106,12 +91,8 @@ def _random_time(month_start, day=None):
 
 @task
 def generate_maintenance_schedules(**context):
-    """
-    Generate maintenance schedules for all trucks for the NEXT month.
-    """
     execution_date = context["logical_date"]
 
-    # Calculate target month (next month)
     if execution_date.month == 12:
         target_year  = execution_date.year + 1
         target_month = 1
@@ -167,7 +148,6 @@ def generate_maintenance_schedules(**context):
                 sched_start  = _random_time(month_start, random_day)
                 sched_end    = sched_start + timedelta(hours=duration_h)
 
-                # If end time exceeds working hours, shift to next day
                 if sched_end.hour > WORK_END_HOUR:
                     sched_start = _random_time(month_start, min(random_day + 1, days_in_month))
                     sched_end   = sched_start + timedelta(hours=duration_h)
@@ -191,8 +171,6 @@ def generate_maintenance_schedules(**context):
         cluster.shutdown()
 
 
-# ── DAG Definition ─────────────────────────────────────────────────────────────
-
 @dag(
     dag_id="maintenance_schedule_generator",
     description="Generate monthly maintenance schedules for fleet trucks",
@@ -202,7 +180,6 @@ def generate_maintenance_schedules(**context):
         "retry_delay":      timedelta(minutes=5),
         "email_on_failure": False,
     },
-    # Run on the 30th of every month at 02:00
     schedule="0 2 30 * *",
     start_date=datetime(2026, 1, 1),
     catchup=False,

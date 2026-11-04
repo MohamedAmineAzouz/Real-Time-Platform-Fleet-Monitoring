@@ -20,26 +20,16 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.window import Window
 
-# ── Configuration ─────────────────────────────────────────────────────────
 CASSANDRA_KEYSPACE = os.getenv("CASSANDRA_KEYSPACE", "fleet")
 LAKE_BUCKET = os.getenv("LAKE_BUCKET", "fleet-data")
 LAKE_PREFIX = os.getenv("LAKE_PREFIX", "silver/truck_history")
 
-# Default S3 Path for MinIO
 S3_PATH = f"s3a://{LAKE_BUCKET}/{LAKE_PREFIX}"
 
 
 def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date: str) -> DataFrame:
-    """
-    Simplified core logic for daily truck statistics.
-    Sum deltas for distance and fuel, and calculate time metrics.
-    """
-
-    # Window to calculate time deltas between events
-    # Including driver_id in partition to handle driver swaps on same truck
     w_truck = Window.partitionBy("truck_id", "driver_id").orderBy("event_time")
 
-    # Calculate duration between events in seconds
     with_time_deltas = (
         telemetry_df
         .withColumn("prev_event_time", lag("event_time", 1).over(w_truck))
@@ -49,11 +39,9 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
                 col("event_time").cast("long") - col("prev_event_time").cast("long")
             ).otherwise(lit(0))
         )
-        # Cap duration at 10 minutes to avoid spikes from gaps in telemetry
         .withColumn("duration_sec", when(col("duration_sec") > 600, lit(600)).otherwise(col("duration_sec")))
     )
 
-    # ── Step 1: Sum Deltas per Truck & Driver ─────────────────────────────
     per_truck_deltas = (
         with_time_deltas
         .groupBy("truck_id", "driver_id")
@@ -75,7 +63,6 @@ def compute_daily_stats(telemetry_df: DataFrame, trucks_df: DataFrame, run_date:
         )
     )
 
-    # ── Step 2: Efficiency Calculation ────────────────────────────────────
     final_stats = (
         per_truck_deltas
         .withColumn(
@@ -126,18 +113,13 @@ def run_job(spark: SparkSession, date_from: str, date_to: str):
         print(f"⚠️ Partition for date {date_from} contains 0 records. Skipping job.")
         return
 
-    # Load Truck Registry from Cassandra
     trucks_df = spark.read \
         .format("org.apache.spark.sql.cassandra") \
         .options(table="trucks", keyspace=CASSANDRA_KEYSPACE) \
         .load()
 
-    # ── 2. Process ────────────────────────────────────────────────────────
-    # Use the date_from as the stat_date for the batch record
     stats_df = compute_daily_stats(telemetry_df, trucks_df, date_from)
 
-    # ── 3. Save ───────────────────────────────────────────────────────────
-    # REMOVED stats_df.count() to prevent double execution of the aggregation pipeline
     print(f"💾 Committing records to Cassandra: {CASSANDRA_KEYSPACE}.batch_daily_truck_stats")
 
     print(f"💾 Committing {stats_df.count()} records to Cassandra: {CASSANDRA_KEYSPACE}.batch_daily_truck_stats")

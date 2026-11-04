@@ -40,7 +40,7 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_eta_prediction.py"
         "retry_delay": timedelta(minutes=1),
         "execution_timeout": timedelta(hours=12),
     },
-    schedule="0 4 * * *",  # 04:00 AM daily (after maintenance_prediction_dag at 03:30)
+    schedule="0 4 * * *",
     start_date=datetime(2026, 6, 1),
     catchup=False,
     tags=["fleet", "eta", "prediction", "spark"],
@@ -52,7 +52,6 @@ def eta_prediction_dag():
     @task
     def get_prediction_dates(**context):
         logical_date = context.get("logical_date") or context.get("execution_date")
-        # Process the full day that just ended
         target_date = logical_date - timedelta(days=1)
         return {
             "date_from": target_date.strftime("%Y-%m-%d"),

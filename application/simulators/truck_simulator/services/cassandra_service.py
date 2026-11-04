@@ -1,11 +1,3 @@
-"""
-cassandra_service.py
-─────────────────────────────────────────────────────────────────────────────
-Cassandra operations for drivers, trucks, and trajets management.
-Works with existing schema (no table modifications).
-─────────────────────────────────────────────────────────────────────────────
-"""
-
 import os
 import sys
 import time
@@ -258,7 +250,6 @@ class CassandraService:
         else:
             month_end = now.replace(month=now.month + 1, day=1)
 
-        # Use ALLOW FILTERING since maintenance_schedules has partition key schedule_id
         query = """
             SELECT schedule_id, truck_id, maintenance_type, description,
                    scheduled_start, scheduled_end, assigned_mechanic, cost
@@ -310,7 +301,6 @@ class CassandraService:
             self.cluster.shutdown()
 
 
-# Global instance
 _cassandra_service: Optional[CassandraService] = None
 
 

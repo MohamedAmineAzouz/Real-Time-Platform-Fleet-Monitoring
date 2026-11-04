@@ -3,9 +3,7 @@ import random, os
 NUM_TRUCKS = int(os.getenv("NUM_TRUCKS", "10"))
 UPDATE_INTERVAL = int(os.getenv("UPDATE_INTERVAL", "2"))  # seconds
 
-# Example cities across Africa and Europe (lon, lat)
 CITIES = {
-    # Morocco
     "Casablanca": (-7.5898, 33.5731),
     "Rabat": (-6.8416, 34.0209),
     "Marrakech": (-8.0089, 31.6295),

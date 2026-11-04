@@ -1,18 +1,3 @@
-"""
-main.py
-
-Fleet Monitoring — Backend API
-
-Data flow:
-  Simulator → Kafka → Spark → Cassandra → THIS API → Frontend
-
-Startup sequence (lifespan):
-  1. Connect to Cassandra
-  2. Compile all prepared statements
-  3. Ready to serve requests
-
-"""
-
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI

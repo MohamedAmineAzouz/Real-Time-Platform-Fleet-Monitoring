@@ -1,12 +1,3 @@
-"""
-data_generator.py
-─────────────────────────────────────────────────────────────────────────────
-Generates initial data for drivers, trucks, and trajets tables in Cassandra.
-- NUM_DRIVERS = NUM_TRUCKS * 1.5
-- Each truck is assigned to a driver
-- Creates initial trajets for active trucks
-─────────────────────────────────────────────────────────────────────────────
-"""
 
 import os
 import sys

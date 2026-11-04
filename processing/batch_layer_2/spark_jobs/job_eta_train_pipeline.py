@@ -50,14 +50,12 @@ ETA_CANDIDATE_PATH      = f"s3a://{LAKE_BUCKET}/models/eta_candidate_model"
 ETA_PRODUCTION_PATH     = f"s3a://{LAKE_BUCKET}/models/eta_production_model"
 ETA_VALIDATION_PATH     = f"s3a://{LAKE_BUCKET}/validation/eta_fixed_validation"
 
-# ── Minimum data quality thresholds ────────────────────────────────────────
-MIN_TRIP_SAMPLES = 5       # minimum trips per corridor to include in training
-MIN_DURATION_H   = 0.1    # less than 6 minutes → noise, discard
-MAX_DURATION_H   = 24.0   # more than 24 hours → outlier, discard
-RMSE_THRESHOLD   = 2.0    # hours — maximum acceptable RMSE to freeze model
+MIN_TRIP_SAMPLES = 5       
+MIN_DURATION_H   = 0.1    
+MAX_DURATION_H   = 24.0   
+RMSE_THRESHOLD   = 2.0    
 
 
-# ── Trip-Level Feature Extraction ─────────────────────────────────────────
 
 def build_trip_features(df: DataFrame) -> DataFrame:
     """
@@ -72,7 +70,6 @@ def build_trip_features(df: DataFrame) -> DataFrame:
     w_trip = Window.partitionBy("truck_id", "start_city", "end_city") \
                    .orderBy("event_time")
 
-    # Tag first and last event timestamps per trip
     trips = df \
         .withColumn("trip_start_ts", _min(unix_timestamp("event_time")).over(
             Window.partitionBy("truck_id", "start_city", "end_city"))) \
@@ -84,7 +81,6 @@ def build_trip_features(df: DataFrame) -> DataFrame:
         .withColumn("hour_of_day", hour(col("trip_start_dt"))) \
         .withColumn("day_of_week", dayofweek(col("trip_start_dt")))
 
-    # Aggregate to one row per trip
     trip_agg = trips.groupBy(
         "truck_id", "start_city", "end_city",
         "hour_of_day", "day_of_week"
@@ -98,13 +94,11 @@ def build_trip_features(df: DataFrame) -> DataFrame:
     return trip_agg
 
 
-# ── Task Implementations ────────────────────────────────────────────────────
 
 def run_prepare_data(spark: SparkSession, date_to: str):
     print("🤖 Task 1: Preparing 90-day telemetry for ETA model training...")
     target_dt = datetime.strptime(date_to, "%Y-%m-%d")
 
-    # Build path list for the last 90 days
     paths = []
     for i in range(90):
         d = (target_dt - timedelta(days=i)).strftime("%Y-%m-%d")
@@ -120,7 +114,6 @@ def run_prepare_data(spark: SparkSession, date_to: str):
             to_date(col("event_time")) >= min_date
         )
 
-    # Keep only the columns needed — prune early for performance
     required_cols = ["truck_id", "event_time", "start_city", "end_city",
                      "speed", "distance_km"]
     for c in required_cols:
@@ -140,17 +133,14 @@ def run_clean_data(spark: SparkSession):
     print("🤖 Task 2: Cleaning data and engineering trip-level features...")
     df = spark.read.parquet(f"{ETA_STAGING_PATH}/prepared_data")
 
-    # Deduplicate events
     df_clean = df.dropDuplicates(["truck_id", "event_time"]) \
                  .filter((col("speed") >= 0) & (col("speed") <= 150)) \
                  .filter(col("distance_km") >= 0) \
                  .fillna(0) \
                  .repartition(10, "truck_id")
 
-    # Build trip-level feature rows
     trip_df = build_trip_features(df_clean)
 
-    # Filter sane trip durations
     filtered = trip_df.filter(
         (col("duration_h") >= MIN_DURATION_H) &
         (col("duration_h") <= MAX_DURATION_H) &
@@ -158,7 +148,6 @@ def run_clean_data(spark: SparkSession):
         (col("distance_km") > 0)
     )
 
-    # Drop corridors with too few trips (would cause overfitting)
     corridor_counts = filtered.groupBy("start_city", "end_city") \
                                .agg(_count("*").alias("trip_count"))
     qualified = filtered.join(
@@ -191,7 +180,6 @@ def run_train_model(spark: SparkSession):
             "Ensure at least 90 days of silver telemetry is available."
         )
 
-    # Feature vector: time-of-day, weekday, speed, distance
     assembler = VectorAssembler(
         inputCols=["hour_of_day", "day_of_week", "avg_speed_kmh", "distance_km"],
         outputCol="features",

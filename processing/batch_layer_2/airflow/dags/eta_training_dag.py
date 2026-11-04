@@ -65,7 +65,7 @@ SPARK_CONF = {
         "retry_delay": timedelta(minutes=1),
         "execution_timeout": timedelta(hours=24),
     },
-    schedule="0 5 1 * *",  # 05:00 AM on the 1st of every month (after maintenance training)
+    schedule="0 5 1 * *",
     start_date=datetime(2026, 6, 1),
     catchup=False,
     tags=["fleet", "eta", "training", "ml", "spark"],

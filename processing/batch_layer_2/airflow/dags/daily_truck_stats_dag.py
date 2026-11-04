@@ -47,21 +47,11 @@ SPARK_JOB_PATH = "/opt/spark/work-dir/spark_jobs/job_daily_truck_stats.py"
     tags=["fleet", "batch", "statistics", "spark", "silver_lake"],
 )
 def daily_truck_stats_dag():
-    """Daily Truck Statistics Pipeline"""
-
     start = EmptyOperator(task_id="stats_pipeline_start")
 
     @task
     def get_execution_dates(**context):
-        """
-        Calculate date range for the job (yesterday).
-        Uses logical_date (execution_date in Airflow < 3.0).
-        """
-        # In Airflow 3.x, context['logical_date'] is preferred
         logical_date = context.get("logical_date") or context.get("execution_date")
-        
-        # We want to process data for the full day BEFORE the run day
-        # If run at 02:00 on May 12, we process May 11
         target_date = logical_date - timedelta(days=1)
         
         return {
@@ -120,5 +110,4 @@ def daily_truck_stats_dag():
     start >> dates >> run_stats_job >> end
 
 
-# Instantiate the DAG
 daily_truck_stats_dag()
